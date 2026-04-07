@@ -1,0 +1,49 @@
+
+
+I want you to design this as a **multi-agent system**, where each part is built and tested independently, then assembled into the final solution once everything is validated.
+
+Start by assigning one agent to handle the **HTTP request layer**. Based on its output, it should spawn a set of **sub-agents**, each responsible for a specific category. These sub-agents should be tasked with creating and testing prompts tailored to their category.
+
+Each category agent must:
+
+* Learn how to form an effective **persona and instruction set** based on the category
+* Act as the **counterparty** in the deal (e.g., investor, buyer, etc.)
+* Identify **missing critical information** required to evaluate the deal
+* Generate **targeted questions** to request that information from the poster
+
+For example:
+
+* If it’s a subto deal, the agent should determine whether there is enough loan information. If not, it should generate clear questions asking for details (loan balance, rate, term, arrears, etc.)
+* If the address is missing, it should ask for it
+* If rental status is unclear, it should ask whether the property is occupied and at what rent
+
+Each agent should produce:
+
+* A **clean, well-structured message** ready to send to the poster
+* A list of **missing data points** needed to move forward
+
+If there is nothing to ask (i.e., the deal is complete), then the agent should instead generate:
+
+* A concise **investment summary**
+* Relevant **location insights** (based on address or ZIP code), such as crime rate, poverty level, and rental estimates
+* Approximate **long-term rent projections** for listed units
+
+All agents must include **robust error handling**, similar to what was implemented in the main application.
+
+---
+
+### Data & Memory Handling
+
+When the workflow transitions from filtering → categorization, there is a risk of losing the original filtered post data. To prevent this:
+
+* Store all filtered items in an **Azure Table** (if appropriate for the app architecture)
+* Use the **ID field from the filtered list** as the key
+* Match it with the **source field from the classifier agent’s response**
+
+This table can also serve as:
+
+* A **shared memory layer** across agents
+* A coordination point between agents and the main scraper
+
+
+The goal is to have a modular system where each agent independently contributes to evaluating the deal, but the final output is **actionable, complete, and ready to use**.

@@ -1,0 +1,103 @@
+{
+  "system_instruction": {
+    "parts": [
+      {
+        "text": "You are a real estate investment analyst looking for deals that could be structured with creative financing. Analyze the following posts and determine the intent of each one.\n\nClassify each post using the 'category' field: use one of the first five schema categories if a property selling intent with creative financing is present. Use 'Regular' if the post is a conventional sale with no creative financing. Use 'JV or Wholesale' if the post is soliciting investors, sharing a business opportunity, claiming to have deals or contracts to assign, asking for a buyer's buy box, or looking for potential partners. Use 'Others' if there is no property selling intent at all.\n\nFor 'Hybrid' applies when the deal implies taking over an existing loan while the buyer covers the remaining gap — including any deal referencing the Morby Method, stacking, or similar creative layering strategies.\n\nIn 'extracted_info', Always return a JSON-stringified object with all financially and contextually relevant details extracted from the post content as dynamic key-value pairs appropriate to the deal category. For 'Others' posts, return only a 'summary' key describing what the post is about that could be useful to an investor.\n\nIn 'contact', extract the author name and any contact details such as email, phone, website, or whether a DM was requested.\n\nIn 'source_id', return the ID extracted from the 'Id' field of that same post."
+      }
+    ]
+  },
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "post#1
+-------Id:facebook_UzpfSTEwMDAyNzU0MDA1Mjc0MjpWSzoxNjc0NjUzNjY2ODY0NzI1
+Content:Desperately need a DSCR Broker/Lender!
+Here's the problem:
+
+We are acquiring a morby method style SFH in San Leon TX and our current lender might not be able to perform.
+
+The issue is the property is a $1.75m 3/2 house (~1500 sqft) and a 10/10 ADU (8000 sqft) that is waterfront. As you can imagine, this is very hard to comp and true comps are father away (5-10 miles).
+
+HOWEVER, this has been operated as a very profitable AirBnb with verifiable revenue of 240-280k gross for the past 3 years.
+
+Replacement cost puts the value over $2m and city appraised value is about $1.9m.
+
+Here's what we need from a lender:
+
+1) non-seasoned, non-sourced DP funds
+
+2) they will use an appraisal based on cost and income approach
+
+3) they will accept STR revenue
+
+4) they allow comps to be further away from the property
+
+PLEASE, if you know anyone, comment or share this post. VERY HAPPY TO PAY REFERRAL FEES.
+
+Author:Bayne Royall
+
+post#2
+-------Id:facebook_UzpfSTYxNTU4NTkwMzg4ODAyOlZLOjE2NzQ2ODIxNTAxOTUyMTA=
+Content:I am trying to purchase a commercial building in Massachusetts. With creative financing   How do i go about it. I am very interested in learning the Subto community
+
+Author:Scott Latour
+
+post#3
+-------Id:facebook_UzpfSTczMjYxNzEwOTpWSzoxNjc0NDAzMTk2ODg5Nzcy
+Content:Hey CREPM HOA = 0 Family! I’m looking for wholesalers in TX who have deals under contract that fits my investor’s buy box: 
+
+ Multi-family (up to 100 Units)
+-Single-family homes
+-Commercial (Any : RVs, Trailer Parks)
+-Land (Raw Land and Infield Lots)
+
+Also, Don’t forget to go to your local leader meetups. If you’re in Houston, TX, Andrew Arriaga has always has something going on where you can learn and connect! 😃👍🏿
+
+Author:Jaisson Louis"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+  
+    "responseSchema": {
+      "type": "ARRAY",
+      "items": {
+        "type": "OBJECT",
+        "properties": {
+          "category": {
+            "type": "STRING",
+            "enum": [
+              "Subject-To",
+              "Seller Finance",
+              "Hybrid",
+              "Fix & Flip",
+              "JV or Wholesale",
+              "Buyers Looking",
+              "Regular",
+              "Others"
+            ]
+          },
+          "extracted_info": {
+            "type": "STRING"
+    
+          },
+        "contact": {
+          "type": "OBJECT",
+          "properties": {
+            "author":       { "type": "STRING" },
+            "email":        { "type": "STRING" },
+            "phone":        { "type": "STRING" },
+            "website":      { "type": "STRING" },
+            "dm_requested": { "type": "BOOLEAN" }
+          }
+      },
+      "source_id": { "type": "STRING" }
+    },
+    "required": ["category", "extracted_info", "contact", "source_id"]
+      }
+    }
+  }
+}

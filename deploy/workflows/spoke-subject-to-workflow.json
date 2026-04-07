@@ -1,0 +1,255 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "geminiModel": {
+      "defaultValue": "gemini-2.5-flash",
+      "type": "String"
+    },
+    "storageTableName": {
+      "defaultValue": "leads",
+      "type": "String"
+    }
+  },
+  "triggers": {
+    "When_an_HTTP_request_is_received": {
+      "type": "Request",
+      "kind": "Http",
+      "description": "Called by hub Logic App after classifying a Subject-To lead",
+      "inputs": {
+        "method": "POST",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "lead_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Fetch_Api_Key": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azuretables']['connectionId']"
+          }
+        },
+        "method": "get",
+        "path": "/Tables/@{encodeURIComponent('config')}/entities(PartitionKey='@{encodeURIComponent('secrets')}',RowKey='@{encodeURIComponent('geminiApiKey')}')"
+      },
+      "runAfter": {}
+    },
+    "Get_Lead_From_Table": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azuretables']['connectionId']"
+          }
+        },
+        "method": "get",
+        "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities(PartitionKey='@{encodeURIComponent('filtered')}',RowKey='@{encodeURIComponent(triggerBody()?['lead_id'])}')"
+      },
+      "runAfter": {}
+    },
+    "Call_Gemini_Outreach": {
+      "type": "Http",
+      "inputs": {
+        "method": "POST",
+        "uri": "@{concat('https://generativelanguage.googleapis.com/v1beta/models/', parameters('geminiModel'), ':generateContent')}",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-goog-api-key": "@body('Fetch_Api_Key')?['Value']"
+        },
+        "body": {
+          "system_instruction": {
+            "parts": [
+              {
+                "text": "You are a SubTo buyer \u2014 you take over mortgage payments while the loan stays in the seller's name.\n\nRead the post. Look for: loan_balance, interest_rate, monthly_payment, location, occupancy_status.\nCity, ZIP, or any partial address counts as location.\n\nMissing fields \u2192 is_complete=false. outreach_message: ask only for what's absent, one or two lines, investor tone \u2014 not a form.\nAll present \u2192 is_complete=true. outreach_message: genuine interest, ask for walkthrough video or pics, ask when to hop on a quick call. Short and real.\ninvestment_summary: PITI vs rent spread, rate advantage, occupancy context.\nlocation_insights: crime index, poverty rate, population growth rate, median rent, market notes \u2014 estimated from address or ZIP."
+              }
+            ]
+          },
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "@{concat('Category: Subject-To\\nAuthor: ',body('Get_Lead_From_Table')?['authorName'],'\\n\\nOriginal Post:\\n',body('Get_Lead_From_Table')?['content'],'\\n\\nContact: ',body('Get_Lead_From_Table')?['contact'])}"
+                }
+              ]
+            }
+          ],
+          "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": {
+              "type": "OBJECT",
+              "properties": {
+                "is_complete": {
+                  "type": "BOOLEAN",
+                  "description": "True only if all of [\"loan_balance\", \"interest_rate\", \"monthly_payment\", \"location\", \"occupancy_status\"] can be determined from the original post."
+                },
+                "missing_fields": {
+                  "type": "ARRAY",
+                  "items": {
+                    "type": "STRING"
+                  },
+                  "description": "Names of fields from [\"loan_balance\", \"interest_rate\", \"monthly_payment\", \"location\", \"occupancy_status\"] that cannot be determined from the post. Empty array when is_complete is true."
+                },
+                "outreach_message": {
+                  "type": "STRING",
+                  "description": "Missing fields: ask only for absent items, 1-2 lines, investor tone. All present: genuine interest + ask for walkthrough video or pics + when to hop on a quick call. Short and real."
+                },
+                "investment_summary": {
+                  "type": "STRING",
+                  "description": "PITI vs rent spread, rate advantage, occupancy context. Empty string when is_complete=false."
+                },
+                "location_insights": {
+                  "type": "OBJECT",
+                  "properties": {
+                    "crime_index": {
+                      "type": "STRING"
+                    },
+                    "poverty_rate": {
+                      "type": "STRING"
+                    },
+                    "population_growth_rate": {
+                      "type": "STRING"
+                    },
+                    "median_rent_estimate": {
+                      "type": "STRING"
+                    },
+                    "market_notes": {
+                      "type": "STRING"
+                    }
+                  },
+                  "description": "Location context from address or ZIP using training knowledge. Empty object when is_complete is false or category is Buyers Looking."
+                }
+              },
+              "required": [
+                "is_complete",
+                "missing_fields",
+                "outreach_message",
+                "investment_summary",
+                "location_insights"
+              ]
+            }
+          }
+        },
+        "retryPolicy": {
+          "type": "exponential",
+          "count": 4,
+          "interval": "PT30S",
+          "minimumInterval": "PT30S",
+          "maximumInterval": "PT10M"
+        }
+      },
+      "runAfter": {
+        "Get_Lead_From_Table": [
+          "Succeeded"
+        ],
+        "Fetch_Api_Key": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Parse_Outreach_Args": {
+      "type": "Compose",
+      "inputs": "@json(body('Call_Gemini_Outreach')['candidates'][0]['content']['parts'][0]['text'])",
+      "runAfter": {
+        "Call_Gemini_Outreach": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Apply_Completeness_Gate": {
+      "type": "Compose",
+      "inputs": {
+        "is_complete": "@outputs('Parse_Outreach_Args')?['is_complete']",
+        "missing_fields": "@outputs('Parse_Outreach_Args')?['missing_fields']",
+        "outreach_message": "@outputs('Parse_Outreach_Args')?['outreach_message']",
+        "investment_summary": "@if(outputs('Parse_Outreach_Args')?['is_complete'], outputs('Parse_Outreach_Args')?['investment_summary'], '')",
+        "location_insights": "@if(outputs('Parse_Outreach_Args')?['is_complete'], outputs('Parse_Outreach_Args')?['location_insights'], json('{}'))"
+      },
+      "runAfter": {
+        "Parse_Outreach_Args": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Upsert_Outreach_To_Table": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azuretables']['connectionId']"
+          }
+        },
+        "method": "patch",
+        "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities(PartitionKey='@{encodeURIComponent('filtered')}',RowKey='@{encodeURIComponent(triggerBody()?['lead_id'])}')",
+        "body": {
+          "outreach_skipped": false,
+          "is_complete": "@{outputs('Apply_Completeness_Gate')?['is_complete']}",
+          "missing_fields": "@{string(outputs('Apply_Completeness_Gate')?['missing_fields'])}",
+          "outreach_message": "@{outputs('Apply_Completeness_Gate')?['outreach_message']}",
+          "investment_summary": "@{outputs('Apply_Completeness_Gate')?['investment_summary']}",
+          "location_insights": "@{string(outputs('Apply_Completeness_Gate')?['location_insights'])}",
+          "outreach_at": "@{utcNow()}",
+          "errorMessage": "none"
+        }
+      },
+      "runAfter": {
+        "Apply_Completeness_Gate": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Handle_Outreach_Error": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azuretables']['connectionId']"
+          }
+        },
+        "method": "patch",
+        "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities(PartitionKey='@{encodeURIComponent('filtered')}',RowKey='@{encodeURIComponent(triggerBody()?['lead_id'])}')",
+        "body": {
+          "outreach_skipped": true,
+          "is_complete": false,
+          "missing_fields": "[]",
+          "outreach_message": "",
+          "investment_summary": "",
+          "location_insights": "{}",
+          "errorMessage": "@{coalesce(actions('Fetch_Api_Key')?['error']?['message'], actions('Get_Lead_From_Table')?['error']?['message'], actions('Call_Gemini_Outreach')?['error']?['message'], actions('Parse_Outreach_Args')?['error']?['message'], actions('Apply_Completeness_Gate')?['error']?['message'], 'Unknown outreach error')}",
+          "outreach_at": "@{utcNow()}"
+        }
+      },
+      "runAfter": {
+        "Fetch_Api_Key": [
+          "Failed"
+        ],
+        "Get_Lead_From_Table": [
+          "Failed"
+        ],
+        "Call_Gemini_Outreach": [
+          "Failed"
+        ],
+        "Parse_Outreach_Args": [
+          "Failed"
+        ],
+        "Apply_Completeness_Gate": [
+          "Failed"
+        ]
+      }
+    }
+  },
+  "outputs": {}
+}

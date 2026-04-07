@@ -1,0 +1,81 @@
+
+ 1. savannah hardcoded out of the hub filter (config agent)                                                                        
+  workflow_builder.py hardcodes only atlanta and jacksonville in the Filter_Leads WHERE clause. savannah is in values.yaml and
+  Python's filter_agent.py reads it correctly — but the hub Logic App silently drops every Savannah lead. This has been broken since
+   the city was added to the YAML.                          
+                                                                                                                                    
+  2. Handle_Outreach_Error doesn't catch Gemini failures (arch agent)                                                               
+  Call_Gemini_Outreach is missing from the spoke's Handle_Outreach_Error.runAfter. If Gemini fails on the outreach call and exhausts
+   retries, the spoke exits without writing outreach_skipped=true or any error marker. That lead sits forever in a "classification  
+  complete, outreach pending" ghost state with no visibility.
+                                                                                                                                    
+  3. Deployed workflow JSONs are stale (config agent)       
+  deploy/workflows/hub-workflow.json still has outputs('Parse_Classify_Args')?['source_id'] as the RowKey in
+  Upsert_Classification_To_Table — the old bug. workflow_builder.py was already fixed in this session but sync.py --apply was never 
+  run. Azure is still running the broken version.
+                                                                                                                                    
+  ---                                                       
+  HIGH — Structural Gaps
+                        
+  4. Contact dict not normalized before use (pipeline agent)
+  _build_user_content in base.py uses contact.get("dm_requested") etc. directly from Gemini's output. Optional fields Gemini omits  
+  produce None in the prompt string (dm_requested=None). If Gemini returns contact as null entirely, it falls back cleanly — but    
+  optional-field None leaks into the prompt and can confuse the spoke's Gemini call.                                                
+                                                                                                                                    
+  5. Classifier batch is all-or-nothing (pipeline agent)                                                                            
+  If Gemini returns zero tool calls (policy block, malfunction, etc.), _parse_tool_response raises ValueError that propagates all
+  the way up — the entire batch of leads fails with no per-lead fallback. One bad response loses everything in the batch.           
+                                                            
+  6. Hub has no classification error handler (arch + data agents)                                                                   
+  If Call_Gemini_Classify exhausts all retries, the lead row has stored_at/content/authorName but no classified_at, no category, no
+  spoke call — and no error flag. No recovery path, no way to detect it programmatically.                                           
+                                                            
+  7. Idempotency broken on duplicate webhooks (data agent)                                                                          
+  Duplicate delivery of the same lead ID overwrites stored_at (masking original receipt time), can change category if Gemini is
+  non-deterministic, and can convert an Others row to an actionable one, firing a second spoke. No first-seen-at guard or ETag      
+  protection.
+                                                                                                                                    
+  ---                                                       
+  MEDIUM — Operational Quality
+                                                                                                                                    
+  8. Others + error rows write sparse columns (data agent)
+  Upsert_Others_To_Table and Handle_Outreach_Error only write 3 fields (outreach_skipped, errorMessage, outreach_at). The other 5   
+  columns (is_complete, missing_fields, outreach_message, investment_summary, location_insights) are absent — not null, literally   
+  missing from the entity. Any downstream reader needs to defensively handle absent columns.
+                                                                                                                                    
+  9. Outreach dispatcher is fully sequential (pipeline agent)
+  5 leads × ~5s/call = 25s of blocking sequential Gemini calls. The classifier sends all leads in one batch. The outreach dispatcher
+   doesn't.                                                                                                                         
+   
+  10. Parse fallback looks identical to genuine incomplete (pipeline agent)                                                         
+  When _parse_response hits tier-3 fallback (raw text as outreach_message), it stores is_complete=false, missing_fields=[] —
+  indistinguishable from a real incomplete result. An API error or rate limit message gets stored as if Gemini analyzed the deal and
+   found it lacking.                                        
+                                                                                                                                    
+  ---                                                       
+  LOW / Confirmed OK
+                                                                                                                                    
+  - RowKey encoding: Python quote() and JS encodeURIComponent() produce identical output for Facebook base64 IDs ✓
+  - Selling intent gate logic: Python and Logic App are identical ✓                                                                 
+  - Completeness gate fallback values: identical ("" / {}) ✓                                                                        
+  - Outreach prompts loaded from same YAML path in both ✓                                                                           
+  - required_fields YAML keys exactly match Python CATEGORY strings ✓                                                               
+  - HOA patterns: different implementation (regex vs. substring) but equivalent coverage ✓                                          
+  - Gemini rate limits: at 5-7 leads/5-10 min you're at ~0.1% of quota — effectively infinite headroom ✓                            
+  - Single partition: fine at current volume, monitor when approaching 50 writes/sec ✓                                              
+                                                                                                                                    
+  ---                                                                                                                               
+  Fix Plan                                                                                                                          
+                                                                                                                                    
+  The changes split into two groups:
+                                                                                                                                    
+  Group A — workflow_builder.py only (regenerate + deploy):                                                                         
+  - Make Filter_Leads build cities dynamically from values.yaml instead of hardcoding 2 of 3
+  - Add Call_Gemini_Outreach: ["Failed"] to spoke Handle_Outreach_Error.runAfter                                                    
+  - Write full schema defaults for Others and error rows                        
+                                                                                                                                    
+  Group B — Python agents (local + Azure parity):           
+  - Normalize contact dict after classifier parsing (defaults for optional fields)                                                  
+  - Wrap classify_leads() exception so one bad batch marks leads as unclassified rather than crashing                               
+                                                                                                                                    
+ 

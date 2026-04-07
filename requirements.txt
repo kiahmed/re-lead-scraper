@@ -1,0 +1,14 @@
+pyyaml
+azure-mgmt-storage
+azure-identity
+azure-mgmt-resource
+azure-mgmt-logic
+python-dotenv
+requests
+azure-mgmt-cosmosdb
+azure-cosmos
+azure-mgmt-redis
+azure-storage-blob
+azure-mgmt-logic
+azure-monitor-query
+azure-data-tables

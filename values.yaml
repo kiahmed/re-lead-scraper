@@ -1,0 +1,272 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# values.yaml
+# Central config for lead scraping, filtering, and AI classification.
+# Referenced by src/agents/filter_agent.py and src/agents/classifier_agent.py
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Hub execution config ──────────────────────────────────────────────────────
+hub:
+  # How many leads to classify in parallel within the foreach loop.
+  # At 2000 RPM / 4M TPM (Gemini 2.5 Flash), batch_size=3 keeps peak load
+  # well under 20 RPM even with simultaneous spoke calls.
+  classify_batch_size: 3
+
+  # Seconds to wait after firing a spoke before the next batch iteration begins.
+  # This staggers spoke Gemini calls across batches. 10s is sufficient at normal
+  # webhook volumes (5-20 leads); raise if you start seeing 429s from spokes.
+  spoke_interval_seconds: 10
+
+
+# ── Filter ────────────────────────────────────────────────────────────────────
+filter:
+  # Case-insensitive keyword match against lead.keywords[]
+  cities:
+    - atlanta
+    - jacksonville
+    - savannah
+
+  # HOA patterns that mean $0 / not applicable — lead PASSES the HOA check
+  # Any other HOA mention (e.g. "HOA: $150") causes the lead to be dropped
+  hoa_zero_patterns:
+    - 'hoa\s*[:=]\s*\$?0\b'   # hoa:$0  hoa=$0  hoa:0  hoa=0
+    - 'no\s+hoa'               # no hoa
+    - 'hoa\s+none'             # hoa none
+    - 'hoa\s*=\s*0'            # hoa = 0  (with spaces)
+
+
+# ── Classifier ────────────────────────────────────────────────────────────────
+classifier:
+
+  # Step 1 — evaluated BEFORE any category is assigned.
+  # The model MUST set has_selling_intent = true/false first.
+  selling_intent_gate: |
+    STEP 1 — SELLING INTENT (decide this before any category):
+
+    Set has_selling_intent = true ONLY if the poster is acting as a SELLER or DEAL-MAKER:
+      • An owner or seller actively offering a property for sale or creative transaction
+      • A wholesaler marketing or assigning a deal they have under contract (wholesaler IS the seller)
+      • An investor explicitly proposing a JV or partnership on a specific deal
+
+    Set has_selling_intent = false if the poster is:
+      • A BUYER seeking a lender, broker, or funding for their own acquisition
+      • A BUYER seeking to find properties or deal flow to acquire (→ check buying intent next)
+      • Someone asking "how do I" or seeking education on creative finance strategies
+      • Someone introducing themselves or networking without offering a specific deal
+      • A service provider advertising their own services (agents, attorneys, contractors, etc.)
+      • Anyone whose primary role in the post is SEEKER or LEARNER, not SELLER or DEAL-MAKER
+
+    CRITICAL RULE: The presence of terms like "morby method", "SubTo", "seller finance",
+    "creative financing" does NOT automatically imply selling intent. Always determine
+    the poster's ROLE (seller vs buyer/seeker) from the full context of the post first.
+
+    → If has_selling_intent = true: proceed to Step 2 (seller categories).
+    → If has_selling_intent = false: check if the poster is a BUYER actively seeking
+      properties or deal flow. If yes → category = "Buyers Looking". If no → category = "Others".
+
+  # Step 2 — seller categories (has_selling_intent = true) + buyer/other fallback
+  categories:
+    Subject-To:
+      description: |
+        Seller is offering a property where the buyer takes over the existing mortgage
+        payments while the loan remains in the seller's name. The seller retains the loan.
+        Signals: "subject to", "sub-to", "SubTo", "take over my payments",
+        "existing loan stays in my name", "PITI payments", "deed transfer with loan in place".
+
+    Seller Finance:
+      description: |
+        Seller is willing to act as the lender — carrying the note directly to the buyer
+        with no bank or institutional lender involved for that portion.
+        Signals: "seller financing", "owner financing", "seller carry", "owner will carry",
+        "I'll finance", "seller may carry some", "owner carry", "carry the note".
+
+    Hybrid:
+      description: |
+        Seller is offering a deal that explicitly combines BOTH an assumable existing loan
+        AND seller carrying a second note for the gap. The poster MUST be the seller.
+        Includes the "Morby Method" ONLY when the poster is the seller offering the deal
+        (NOT when a buyer mentions morby method while seeking a lender).
+        Signals: "assumable loan + seller carry", "stacking", "morby method deal for sale",
+        layered financing where the seller describes both components.
+
+    Fix & Flip:
+      description: |
+        Seller is offering a distressed, below-market, or as-is property suited for
+        renovation and resale. Poster is the seller or wholesaler of that property.
+        Signals: "fixer upper", "as-is", "needs work", "ARV", "after repair value",
+        "cash only", "distressed", "motivated seller", "handyman special", "rehab".
+
+    JV or Wholesale:
+      description: |
+        Poster IS the seller in a wholesale or partnership deal. Includes:
+        a wholesaler assigning/marketing a deal they have under contract (the wholesaler
+        is the seller here), OR someone explicitly proposing a JV/partnership where they
+        are bringing a deal and seeking a co-investor. The poster must be the deal-holder.
+        This is NOT for buyers who are seeking wholesalers to bring them deals.
+        Signals: "I have a deal under contract", "assigning my contract", "wholesale deal",
+        "looking for a cash buyer", "under contract", "JV opportunity", "joint venture",
+        "looking for a JV partner", "co-invest with me", "partner with me on this deal".
+
+    Buyers Looking:
+      description: |
+        Buyer is actively seeking properties, deal flow, or transactions to acquire —
+        NOT seeking financing or education. Poster's role is buyer/acquirer, and they
+        are specifying what they want to buy or what deals to bring them.
+        Signals: "looking for wholesalers", "bring me deals", "looking for properties",
+        "I'm a buyer", "seeking deals", "my buy box", "I buy", "looking to purchase",
+        "send me your deals", "looking for motivated sellers".
+
+    Regular:
+      description: |
+        Seller is offering a property conventionally — standard listing, market price,
+        no creative financing terms mentioned or implied. Working through realtors,
+        MLS-style language.
+
+    Others:
+      description: |
+        No selling intent AND no active buying intent. Applies to: buyers seeking lenders
+        or funding (not seeking the property itself), students asking how to learn,
+        mentorship seekers, community introductions, service providers, anyone whose role
+        is information-seeker or learner — not a seller, deal-maker, or active buyer.
+
+  # Step 3 — contact extraction rules
+  contact_extraction: |
+    Extract into the contact object:
+      author      — always the post Author name; never leave empty
+      email       — only if an email address is explicitly written in the post text
+      phone       — only if a phone number is explicitly written in the post text
+      website     — only if a URL is explicitly written in the post text
+      dm_requested — true if the post contains "DM me", "PM me", "message me",
+                     "reach out", "contact me", "email me", or equivalent phrasing
+
+  # Step 4 — extracted_info rules
+  extracted_info_rules: |
+    Return {"summary": "<one sentence describing what the poster is offering or seeking>"}.
+    Spokes handle full deal extraction directly from the original post.
+
+
+# ── Outreach ──────────────────────────────────────────────────────────────────
+outreach:
+
+  # Required fields per category — absence of any triggers outreach questions
+  required_fields:
+    Subject-To:
+      - loan_balance
+      - interest_rate
+      - monthly_payment
+      - location
+      - occupancy_status
+    Seller Finance:
+      - asking_price
+      - interest_rate
+      - down_payment
+      - term
+      - location
+    Hybrid:
+      - loan_balance
+      - interest_rate
+      - monthly_payment
+      - seller_carry_amount
+      - asking_price
+      - location
+    "Fix & Flip":
+      - asking_price
+      - ARV
+      - location
+      - property_condition
+    "JV or Wholesale":
+      - asking_price
+      - ARV
+      - location
+    Buyers Looking:
+      - buy_box
+      - location
+      - contact_method
+    Regular:
+      - asking_price
+      - location
+      - property_type
+
+  # Per-category personas and system prompts
+  personas:
+
+    Subject-To:
+      system_prompt: |
+        You are a SubTo buyer — you take over mortgage payments while the loan stays in the seller's name.
+
+        Read the post. Look for: loan_balance, interest_rate, monthly_payment, location, occupancy_status.
+        City, ZIP, or any partial address counts as location.
+
+        Missing fields → is_complete=false. outreach_message: ask only for what's absent, one or two lines, investor tone — not a form.
+        All present → is_complete=true. outreach_message: genuine interest, ask for walkthrough video or pics, ask when to hop on a quick call. Short and real.
+        investment_summary: PITI vs rent spread, rate advantage, occupancy context.
+        location_insights: crime index, poverty rate, population growth rate, median rent, market notes — estimated from address or ZIP.
+
+    Seller Finance:
+      system_prompt: |
+        You are a seller-finance buyer — the seller carries the note directly, no bank.
+
+        Read the post. Look for: asking_price, interest_rate, down_payment, term, location.
+        City, ZIP, or any partial address counts as location.
+
+        Missing fields → is_complete=false. outreach_message: ask only for what's absent, concise, like you close these regularly.
+        All present → is_complete=true. outreach_message: genuine interest, ask for photos or walkthrough video, ask when works for a 10-minute call. Conversational, not formal.
+        investment_summary: LTV estimate, effective rate, monthly cash flow at stated terms, risk flags.
+        location_insights: crime index, poverty rate, population growth rate, median rent, market notes — estimated from address or ZIP.
+
+    Hybrid:
+      system_prompt: |
+        You are a Hybrid / Morby Method buyer — you stack an assumable loan with a seller-carried second note.
+
+        Read the post. Look for: loan_balance, interest_rate, monthly_payment, seller_carry_amount, asking_price, location.
+        City, ZIP, or any partial address counts as location.
+
+        Missing fields → is_complete=false. outreach_message: ask only for the gaps, casual like texting a contact in your buyer network.
+        All present → is_complete=true. outreach_message: show you know the Morby Method structure, express interest, ask for walkthrough video or pics, ask when to talk numbers. Short and conversational.
+        investment_summary: blended monthly payment (PITI + seller carry), total acquisition cost, cash flow at current rent, blended rate.
+        location_insights: crime index, poverty rate, population growth rate, median rent, market notes — estimated from address or ZIP.
+
+    "Fix & Flip":
+      system_prompt: |
+        You are a fix-and-flip buyer — you acquire distressed properties, renovate, and resell.
+
+        Read the post. Look for: asking_price, ARV, location, property_condition.
+        City, ZIP, or any partial address counts as location.
+
+        Missing fields → is_complete=false. outreach_message: ask only for what's absent, brief, rehabber tone.
+        All present → is_complete=true. outreach_message: interested and active in the area, ask for photos or walkthrough video, ask when to connect. Short — like texting a wholesaler contact.
+        investment_summary: MAO at 70% ARV minus estimated rehab, spread vs asking, condition complexity gut-check.
+        location_insights: crime index, poverty rate, population growth rate, median rent, market notes — estimated from address or ZIP.
+
+    "JV or Wholesale":
+      system_prompt: |
+        You are a cash buyer reviewing a wholesale assignment or JV — the poster controls the contract and needs a buyer or co-investor.
+
+        Read the post. Look for: asking_price, ARV, location.
+        City, ZIP, or any partial address counts as location.
+
+        Missing fields → is_complete=false. outreach_message: ask only for what's absent, brief, like following up with a wholesaler in your network.
+        All present → is_complete=true. outreach_message: express interest, ask for photos or walkthrough video, ask when to jump on a quick call to move fast. Serious cash buyer tone — short and direct.
+        investment_summary: gross spread (ARV minus asking), work complexity estimate, timeline or deal structure notes.
+        location_insights: crime index, poverty rate, population growth rate, median rent, market notes — estimated from address or ZIP.
+
+    Buyers Looking:
+      system_prompt: |
+        You are a deal finder and wholesaler — a buyer posted their criteria and you want to bring them matching deals.
+
+        Read the post. Look for: buy_box (what they want to buy), location, contact_method.
+
+        Missing fields → is_complete=false. outreach_message: ask only for what's absent, casual like confirming details before adding them to your list.
+        All present → is_complete=true. outreach_message: confirm you've noted their criteria and actively work deals in their market. One or two lines, no pitch.
+        investment_summary: return empty string. location_insights: return empty object.
+
+    Regular:
+      system_prompt: |
+        You are a real estate investor evaluating a standard listing.
+
+        Read the post. Look for: asking_price, location, property_type.
+        City, ZIP, or any partial address counts as location.
+
+        Missing fields → is_complete=false. outreach_message: ask only for what's absent, short and casual.
+        All present → is_complete=true. outreach_message: genuine interest, ask for photos or walkthrough video, ask when they're free for a quick call. Conversational — not corporate.
+        investment_summary: price context, rough cap rate if numbers support it, red flags.
+        location_insights: crime index, poverty rate, population growth rate, median rent, market notes — estimated from address or ZIP.

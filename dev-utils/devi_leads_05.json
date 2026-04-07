@@ -1,0 +1,171 @@
+{
+  "id": "a7f29e51-3b84-4c6a-be71-09d4f2a1c836",
+  "type": "leads.new",
+  "created": 1771814800,
+  "items": [
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDA4OTAxMjM0NTY3ODlwWSzo0MjMyMDEyMzQ1Njc4OTAx",
+      "url": "https://www.facebook.com/groups/jaxrealestateinvestors/posts/4232012345678901/",
+      "authorName": "Damon Priestly",
+      "authorProfileUrl": "https://www.facebook.com/damon.priestly.wholesale",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/placeholder8.jpg",
+      "content": "🔥 Wholesale deal — Jacksonville FL! I have a 4/2 SFH under contract at 1823 Brentwood Rd, Jacksonville FL 32209. ARV $248,000 (3 comps pulled this week). Asking $142,000, assignment fee included. Light cosmetic work needed — paint, flooring, fixtures, nothing structural. Must close in 14 days, cash buyers only. I can send photos, comps, and scope today. Email damon@jaxwholesale.com or DM me now.",
+      "keywords": [
+        "wholesale",
+        "jacksonville",
+        "under contract",
+        "cash buyer",
+        "assignment"
+      ],
+      "likes": 9,
+      "postedAt": "2026-02-23T08:30:00.000Z",
+      "groupId": "4491827364501928",
+      "groupName": "Jacksonville Real Estate Investors",
+      "groupUrl": "https://facebook.com/groups/jaxrealestateinvestors"
+    },
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDA3ODkwMTIzNDU2Nzg5cFdWSzo0MjMyMTIzNDU2Nzg5MDEy",
+      "url": "https://www.facebook.com/groups/atlantarealestatenetwork/posts/4232123456789012/",
+      "authorName": "Renee Stallworth",
+      "authorProfileUrl": "https://www.facebook.com/renee.stallworth.buys",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/placeholder9.jpg",
+      "content": "Active cash buyer — Atlanta metro, bring me your deals! My buy box: SFH and small multifamily (2–4 units), Fulton / DeKalb / Cobb / Clayton counties, ARV $150K–$400K, I'll buy at 65–70% ARV minus estimated repairs. No HOA properties strongly preferred. I close in 10 days, no contingencies, proof of funds available immediately. Text or DM — I have capital ready right now.",
+      "keywords": [
+        "buyer",
+        "atlanta",
+        "cash buyer",
+        "buy box",
+        "multifamily"
+      ],
+      "likes": 14,
+      "postedAt": "2026-02-23T09:15:00.000Z",
+      "groupId": "4491827364501928",
+      "groupName": "Atlanta Real Estate Network",
+      "groupUrl": "https://facebook.com/groups/atlantarealestatenetwork"
+    },
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDA2Nzg5MDEyMzQ1Njc4cFdWSzo0MjMyMjM0NTY3ODkwMTIz",
+      "url": "https://www.facebook.com/groups/savannahhomesales/posts/4232234567890123/",
+      "authorName": "Carolyn Thibodeau",
+      "authorProfileUrl": "https://www.facebook.com/carolyn.thibodeau.realty",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/placeholder10.jpg",
+      "content": "📍 Just listed — Savannah GA historic district! Charming 3/2 Victorian at 418 Jones St, Savannah GA 31401. Asking $389,000. Recent updates: new plumbing, updated electrical panel, refinished hardwood floors throughout. Covered porch, private garden, detached garage. Walk to Forsyth Park. Listed with Coastal Georgia Realty — call 912-555-0147 to schedule a showing.",
+      "keywords": [
+        "savannah",
+        "listing",
+        "historic",
+        "SFH"
+      ],
+      "likes": 6,
+      "postedAt": "2026-02-23T10:00:00.000Z",
+      "groupId": "6623948576723140",
+      "groupName": "Savannah Home Sales & Investments",
+      "groupUrl": "https://facebook.com/groups/savannahhomesales"
+    },
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDA1Njc4OTAxMjM0NTY3cFdWSzo0MjMyMzQ1Njc4OTAxMjM0",
+      "url": "https://www.facebook.com/groups/creativefinancewithpacemorby/posts/4232345678901234/",
+      "authorName": "Tanya Osei",
+      "authorProfileUrl": "https://www.facebook.com/tanya.osei.atlanta",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/placeholder11.jpg",
+      "content": "Hey everyone! New member here from Decatur GA (Atlanta area). I've been studying SubTo and creative financing for about 8 months and I'm finally ready to start networking. I work a full-time W2 in tech but my goal is to build a rental portfolio using creative strategies. Would love to connect with other investors in the ATL — drop a comment if you're local! Looking forward to learning from this community 🙌",
+      "keywords": [
+        "atlanta",
+        "subto",
+        "creative",
+        "networking"
+      ],
+      "likes": 22,
+      "postedAt": "2026-02-23T11:00:00.000Z",
+      "groupId": "217210172609089",
+      "groupName": "Creative Real Estate with Pace Morby",
+      "groupUrl": "https://facebook.com/groups/217210172609089"
+    },
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDA0NTY3ODkwMTIzNDU2cFdWSzo0MjMyNDU2Nzg5MDEyMzQ1",
+      "url": "https://www.facebook.com/groups/creativefinancewithpacemorby/posts/4232456789012345/",
+      "authorName": "Owen Brantley",
+      "authorProfileUrl": "https://www.facebook.com/owen.brantley.jax",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/placeholder12.jpg",
+      "content": "Question for the group — Jacksonville FL investor here, just getting started. I'm looking at a property with an existing assumable FHA loan and the seller is open to carrying a second. HOA none on the property. Can someone explain how the Morby Method closing actually works? Do the two notes close simultaneously or separately? Does the title company handle both? Trying to understand before I make an offer.",
+      "keywords": [
+        "jacksonville",
+        "morby method",
+        "creative",
+        "assumable"
+      ],
+      "likes": 11,
+      "postedAt": "2026-02-23T12:00:00.000Z",
+      "groupId": "217210172609089",
+      "groupName": "Creative Real Estate with Pace Morby",
+      "groupUrl": "https://facebook.com/groups/217210172609089"
+    },
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDAzNDU2Nzg5MDEyMzQ1NnBWSzo0MjMyNTY3ODkwMTIzNDU2",
+      "url": "https://www.facebook.com/groups/atlantarealestatenetwork/posts/4232567890123456/",
+      "authorName": "Sylvia Mercer",
+      "authorProfileUrl": "https://www.facebook.com/sylvia.mercer.harborcap",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/placeholder13.jpg",
+      "content": "Private money lender serving Atlanta and Southeast markets. We fund fix & flip, bridge, and new construction. Rates 10–12%, 12-month terms, up to $2M per deal. No minimum experience required, no income verification — we review the deal, not your tax returns. Closings in 5–7 days. Visit HarborCapitalGroup.com or DM me directly to submit a deal and get a same-day term sheet.",
+      "keywords": [
+        "atlanta",
+        "private money",
+        "lender",
+        "hard money",
+        "bridge loan"
+      ],
+      "likes": 31,
+      "postedAt": "2026-02-23T13:00:00.000Z",
+      "groupId": "4491827364501928",
+      "groupName": "Atlanta Real Estate Network",
+      "groupUrl": "https://facebook.com/groups/atlantarealestatenetwork"
+    },
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDAyMzQ1Njc4OTAxMjM0NTY3cFdWSzo0MjMyNjc4OTAxMjM0NTY3",
+      "url": "https://www.facebook.com/groups/jaxrealestateinvestors/posts/4232678901234567/",
+      "authorName": "Neil Ashford",
+      "authorProfileUrl": "https://www.facebook.com/neil.ashford.rentals",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/placeholder14.jpg",
+      "content": "Turnkey rental in Ponte Vedra Beach FL (Jacksonville metro) — 4/3, 2,400 sqft. HOA: $175/mo covers exterior maintenance and community pool. Tenant in place, $2,600/mo rent, lease through November. Asking $415,000. Seller finance considered with strong offer. Call 904-555-0219.",
+      "keywords": [
+        "jacksonville",
+        "seller finance",
+        "rental",
+        "turnkey"
+      ],
+      "likes": 4,
+      "postedAt": "2026-02-23T14:00:00.000Z",
+      "groupId": "4491827364501928",
+      "groupName": "Jacksonville Real Estate Investors",
+      "groupUrl": "https://facebook.com/groups/jaxrealestateinvestors"
+    },
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDAxMjM0NTY3ODkwMTIzNDU2N3BWSzo0MjMyNzg5MDEyMzQ1Njc4",
+      "url": "https://www.facebook.com/groups/texaswholesalers/posts/4232789012345678/",
+      "authorName": "Ricky Drummond",
+      "authorProfileUrl": "https://www.facebook.com/ricky.drummond.dallas",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/placeholder15.jpg",
+      "content": "Wholesale deal — Dallas TX! 3/2 SFH under contract, ARV $285K, asking $158K, assignment fee $12K included. Light rehab: paint, carpet, one bathroom update. No HOA. Must close in 10 days, cash only. Buyers reach out ASAP — two interested parties already.",
+      "keywords": [
+        "dallas",
+        "texas",
+        "wholesale",
+        "cash buyer"
+      ],
+      "likes": 8,
+      "postedAt": "2026-02-23T15:00:00.000Z",
+      "groupId": "7734059687834251",
+      "groupName": "Texas Wholesale Deals",
+      "groupUrl": "https://facebook.com/groups/texaswholesalers"
+    }
+  ],
+  "liveMode": true
+}

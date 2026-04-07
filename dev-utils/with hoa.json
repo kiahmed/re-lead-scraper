@@ -1,0 +1,26 @@
+{
+  "id": "ae8eabee-e652-4612-bdc3-a066d59e649e",
+  "type": "leads.new",
+  "created": 1771641310,
+  "items": [
+    {
+      "provider": "facebook",
+      "id": "facebook_UzpfSTEwMDA3MDM0MDkwNTU5MDpWSzo0MjI3NjM1MjYwODIyMDUy",
+      "url": "https://www.facebook.com/groups/1845572545695014/posts/4227635260822052/",
+      "authorName": "Howell Levine",
+      "authorProfileUrl": "https://www.facebook.com/howell.levine",
+      "authorProfilePicture": "https://scontent-atl3-1.xx.fbcdn.net/v/t39.30808-1/432983562_461444762876883_6596550422041261745_n.jpg?stp=c256.0.1536.1536a_cp0_dst-jpg_s80x80_tt6&_nc_cat=100&ccb=1-7&_nc_sid=1d2534&_nc_ohc=om7rp0tTfDkQ7kNvwGh_f0j&_nc_oc=AdlVa-UT4EA6ULAOUQIrr1n0SgHNVxC_NWivv73oarihFfcFh7E6IWnBeBnTrtZLhyg&_nc_zt=24&_nc_ht=scontent-atl3-1.xx&_nc_gid=jqAa0XYStWfc40D5cu4LjA&oh=00_Afv3cbLGla9OYacvQ0V8l6kcnGZmoz7EjGHD9aHG6nCszw&oe=699EF0A2",
+      "content": "Multi unit Texas. HOA = $6",
+      "keywords": [
+        "multi",
+        "Atlanta"
+      ],
+      "likes": 0,
+      "postedAt": "2026-02-20T22:52:24.000Z",
+      "groupId": "1845572545695014",
+      "groupName": "Commercial Real Estate Multifamily",
+      "groupUrl": "https://facebook.com/groups/1845572545695014"
+    }
+  ],
+  "liveMode": true
+}
