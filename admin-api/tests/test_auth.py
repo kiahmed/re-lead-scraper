@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -70,7 +70,7 @@ def test_expired_session_rejected_and_deleted(alice):
     rk = security.token_hash(token)
     tables.upsert(tables.TABLE_SESSIONS, {
         "PartitionKey": "session", "RowKey": rk,
-        "expires_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+        "expires_at": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
     })
     with pytest.raises(ApiError) as e:
         auth.validate_token(token)

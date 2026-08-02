@@ -14,7 +14,7 @@ import argparse
 import getpass
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from core import auth, tables, users
 from core.http import ApiError
@@ -63,7 +63,7 @@ def main() -> None:
                 state = "active" if u["is_active"] else "DISABLED"
                 print(f"{u['username']:24} {u['role']:8} {state:8} last login: {u['last_login_at'] or '—'}")
         elif args.cmd == "purge-sessions":
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             rows = tables.query(tables.TABLE_SESSIONS, f"PartitionKey eq '{auth.SESSION_PK}'")
             purged = 0
             for row in rows:

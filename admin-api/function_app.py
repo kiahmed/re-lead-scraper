@@ -13,8 +13,7 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 @app.route(route="{*path}", methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"])
 def api(req: func.HttpRequest) -> func.HttpResponse:
     path = req.route_params.get("path", "")
-    if path.startswith("api/"):
-        path = path[4:]
+    path = path.removeprefix("api/")
     try:
         body = req.get_json() if req.get_body() else {}
     except ValueError:

@@ -89,7 +89,7 @@ def _match(pattern: str, path: str) -> dict | None:
     if len(p_segs) != len(segs):
         return None
     params = {}
-    for p, s in zip(p_segs, segs):
+    for p, s in zip(p_segs, segs, strict=True):
         if p.startswith("{") and p.endswith("}"):
             params[p[1:-1]] = s
         elif p != s:

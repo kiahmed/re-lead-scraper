@@ -5,8 +5,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import tables  # noqa: E402
-from tests.fakes import FakeProvider  # noqa: E402
+from core import tables
+from tests.fakes import FakeProvider
 
 
 @pytest.fixture(autouse=True)

@@ -73,7 +73,7 @@ def list_leads(query: dict) -> dict:
     rows = tables.query(tables.TABLE_LEADS, "PartitionKey eq 'filtered'")
     all_leads = sorted(
         (_to_lead(r) for r in rows),
-        key=lambda l: l["stored_at"], reverse=True,
+        key=lambda ld: ld["stored_at"], reverse=True,
     )
     category = query.get("category", "")
     is_complete = query.get("is_complete", "")
@@ -81,17 +81,17 @@ def list_leads(query: dict) -> dict:
 
     # counts by category over the search-filtered (but not category-filtered)
     # set, so the category tabs always show what's behind them
-    searched = [l for l in all_leads if _matches(l, "", is_complete, q)]
+    searched = [ld for ld in all_leads if _matches(ld, "", is_complete, q)]
     counts: dict[str, int] = {}
     for lead in searched:
         counts[lead["category"] or "Unclassified"] = counts.get(lead["category"] or "Unclassified", 0) + 1
 
-    filtered = [l for l in searched if _matches(l, category, "", "")]
+    filtered = [ld for ld in searched if _matches(ld, category, "", "")]
     try:
         page = max(1, int(query.get("page", 1)))
         page_size = min(100, max(1, int(query.get("pageSize", 25))))
     except ValueError:
-        raise ApiError(400, "page and pageSize must be integers")
+        raise ApiError(400, "page and pageSize must be integers") from None
     start = (page - 1) * page_size
     return {
         "items": filtered[start:start + page_size],

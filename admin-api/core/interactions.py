@@ -5,7 +5,7 @@ RowKey = inverted-nanosecond tick + random suffix → newest-first natural order
 """
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from . import tables
 from .http import ApiError
@@ -15,7 +15,7 @@ _PATCHABLE = {"body", "status", "follow_up_at", "follow_up_done"}
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _new_row_key() -> str:

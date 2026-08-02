@@ -1,6 +1,6 @@
 """Login, session validation, lockout. Sessions store only the token's
 SHA-256 hash; a storage leak never yields usable sessions."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from . import security, tables
 from .http import ApiError
@@ -14,7 +14,7 @@ LOCKOUT_MINUTES = 15
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _iso(dt: datetime) -> str:

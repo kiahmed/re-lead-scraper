@@ -1,6 +1,6 @@
 """Users CRUD. Creation/password-reset are CLI-driven (Make targets);
 the HTTP surface only lists, patches, and soft-deletes."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from . import auth, security, tables
 from .http import ApiError
@@ -9,7 +9,7 @@ _PATCHABLE = {"display_name", "is_active", "role"}
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def create_user(username: str, password: str, display_name: str = "", role: str = "admin") -> dict:

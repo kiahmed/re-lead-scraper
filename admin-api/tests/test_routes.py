@@ -21,7 +21,7 @@ def test_health_is_anonymous():
 
 def test_protected_routes_require_token():
     for path in ("leads", "users", "meta", "auth/me"):
-        status, body = dispatch(_req(), path)
+        status, _body = dispatch(_req(), path)
         assert status == 401, path
 
 
