@@ -26,9 +26,17 @@
 - **Scale ceiling:** Azure Tables list queries are fine to ~10–20k leads; beyond that needs an index partition (not built now, path reserved).
 - **Future-proofed, not built:** real FB message sending, roles, re-run outreach per lead — all land as additive rows/endpoints later, no migrations.
 
-## What approval triggers
+## Implementation status (2026-08-02)
 
-Phase 1: scaffold `admin-ui/` + `admin-api/` + Makefile → Phase 2: auth + users CLI → Phase 3: leads list/detail panes → Phase 4: interactions/timeline → Phase 5: Azure deploy. Each phase tested before the next, per requirements.
+Phases 1–4 built and verified locally; Azure deploy (phase 5) is scripted but **not yet run**:
+
+- `admin-api/` — framework-agnostic handlers + Azure Functions entry (`function_app.py`) + Flask local adapter (`dev_server.py`) + provisioning CLI (`cli.py`). **34 pytest tests, ruff clean.**
+- `admin-ui/` — React 19 + Vite + TS strict; login, lead list (search / category tabs with counts / completeness filter / pagination), two-pane detail with notes & follow-ups. **12 vitest tests, tsc clean, 92 kB gzip bundle.**
+- `Makefile` — all required categories; `make help` lists everything. `deploy-be` / `deploy-azure` / `publish` ready for phase 5.
+- `deploy/admin-ui.bicep` — SWA Free + Y1 Function App + `users`/`sessions`/`interactions` tables; compiles clean; separate from main.bicep.
+- **Local deploy verified against real storage**: `make migrate` created the three tables in `releadscraper`; a smoke user logged in via the API and browsed 281 real leads (counts per category correct), created/deleted a note, SPA served with deep-link fallback. Smoke user disabled and its session removed afterwards.
+
+To go live: `make publish` (runs the Bicep deploy, zips the function code, deploys the SPA), then `make create-user U=<you>`.
 
 ## Approval record (2026-08-02)
 
