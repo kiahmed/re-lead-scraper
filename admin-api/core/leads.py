@@ -1,0 +1,109 @@
+"""Read-only view over the pipeline's leads table.
+
+The admin API NEVER writes to `leads` — hub/spokes MERGE-upsert into it
+continuously and admin-originated data lives in `interactions` instead.
+"""
+import json
+
+from . import tables
+from .http import ApiError
+
+SNIPPET_CHARS = 280
+
+
+def _parse_json(value, fallback):
+    if not value:
+        return fallback
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _to_lead(row: dict, full: bool = False) -> dict:
+    content = row.get("content", "")
+    lead = {
+        "id": row.get("lead_id", "") or row.get("RowKey", ""),
+        "authorName": row.get("authorName", ""),
+        "groupName": row.get("groupName", ""),
+        "keywords": _parse_json(row.get("keywords"), []),
+        "category": row.get("category", ""),
+        "has_selling_intent": row.get("has_selling_intent"),
+        "is_complete": row.get("is_complete"),
+        "outreach_skipped": row.get("outreach_skipped"),
+        "errorMessage": row.get("errorMessage", ""),
+        "missing_fields": _parse_json(row.get("missing_fields"), []),
+        "stored_at": row.get("stored_at", ""),
+        "classified_at": row.get("classified_at", ""),
+        "outreach_at": row.get("outreach_at", ""),
+    }
+    if full:
+        lead.update({
+            "content": content,
+            "contact": _parse_json(row.get("contact"), {}),
+            "extracted_info": _parse_json(row.get("extracted_info"), row.get("extracted_info", "")),
+            "outreach_message": row.get("outreach_message", ""),
+            "investment_summary": row.get("investment_summary", ""),
+            "location_insights": _parse_json(row.get("location_insights"), {}),
+        })
+    else:
+        lead["snippet"] = content[:SNIPPET_CHARS] + ("…" if len(content) > SNIPPET_CHARS else "")
+    return lead
+
+
+def _matches(lead: dict, category: str, is_complete: str, q: str) -> bool:
+    if category and lead["category"] != category:
+        return False
+    if is_complete in ("true", "false") and lead["is_complete"] is not None:
+        if bool(lead["is_complete"]) != (is_complete == "true"):
+            return False
+    elif is_complete in ("true", "false"):
+        return False
+    if q:
+        hay = " ".join([
+            lead.get("snippet", ""), lead.get("content", ""),
+            lead["authorName"], lead["groupName"], " ".join(lead["keywords"]),
+        ]).lower()
+        if q.lower() not in hay:
+            return False
+    return True
+
+
+def list_leads(query: dict) -> dict:
+    rows = tables.query(tables.TABLE_LEADS, "PartitionKey eq 'filtered'")
+    all_leads = sorted(
+        (_to_lead(r) for r in rows),
+        key=lambda l: l["stored_at"], reverse=True,
+    )
+    category = query.get("category", "")
+    is_complete = query.get("is_complete", "")
+    q = query.get("q", "")
+
+    # counts by category over the search-filtered (but not category-filtered)
+    # set, so the category tabs always show what's behind them
+    searched = [l for l in all_leads if _matches(l, "", is_complete, q)]
+    counts: dict[str, int] = {}
+    for lead in searched:
+        counts[lead["category"] or "Unclassified"] = counts.get(lead["category"] or "Unclassified", 0) + 1
+
+    filtered = [l for l in searched if _matches(l, category, "", "")]
+    try:
+        page = max(1, int(query.get("page", 1)))
+        page_size = min(100, max(1, int(query.get("pageSize", 25))))
+    except ValueError:
+        raise ApiError(400, "page and pageSize must be integers")
+    start = (page - 1) * page_size
+    return {
+        "items": filtered[start:start + page_size],
+        "total": len(filtered),
+        "page": page,
+        "pageSize": page_size,
+        "counts": counts,
+    }
+
+
+def get_lead(lead_id: str) -> dict:
+    row = tables.get_entity(tables.TABLE_LEADS, "filtered", tables.encode_row_key(lead_id))
+    if row is None:
+        raise ApiError(404, "lead not found")
+    return _to_lead(row, full=True)
