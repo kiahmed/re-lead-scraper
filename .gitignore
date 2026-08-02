@@ -3,3 +3,9 @@ __pycache__/
 *.pyc
 .venv/
 dev-utils/run-logs/
+
+# admin UI/API
+node_modules/
+admin-ui/dist/
+admin-api/local.settings.json
+artifacts/
