@@ -29,6 +29,13 @@ class ApiRequest:
         return ""
 
     def bearer_token(self) -> str:
+        # X-Admin-Token first: SWA's proxy REPLACES the Authorization header
+        # with its own platform token before the request reaches managed
+        # functions, so Authorization is only trustworthy outside SWA (local
+        # dev / standalone Function App).
+        custom = self.header("X-Admin-Token").strip()
+        if custom:
+            return custom
         auth = self.header("Authorization")
         if auth.startswith("Bearer "):
             return auth[7:].strip()

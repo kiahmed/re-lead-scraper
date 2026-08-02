@@ -38,6 +38,14 @@ Phases 1–4 built and verified locally; Azure deploy (phase 5) is scripted but 
 
 To go live: `make publish` (runs the Bicep deploy, zips the function code, deploys the SPA), then `make create-user U=<you>`.
 
+## Deployment record (2026-08-02, phase "go-live")
+
+- Renamed to **FlyNest Leads Admin**; per-lead edit (pencil → detail in edit mode, whitelisted PATCH) and delete (bin → confirm dialog, removes lead + its interactions) added on user request. This supersedes the "leads read-only" rule from decision #6 — writes are limited to `category / authorName / groupName / contact / extracted_info / outreach_message / investment_summary`; pipeline stage columns remain untouchable.
+- **Live at: https://kind-hill-00577c70f.7.azurestaticapps.net** — SWA Free in East US 2, storage stays in East US.
+- **Decision #2 amendment (forced):** the subscription has **0 quota for Y1 consumption plans in every region** (`SubscriptionIsOverQuotaForSku`), so the standalone Function App could not be provisioned. The API runs as **SWA managed functions** (same code, v1 entry point in `api_handler/`, deps vendored to `.python_packages`). The standalone path is preserved in `deploy/admin-ui.bicep` behind `deployFunctionApp=true` — flip it after a quota increase, set `VITE_API_BASE`, and nothing else changes.
+- Two Azure-specific quirks encoded in the code: SWA rejects `AzureWebJobs*` app settings (hence v1 function model), and SWA **replaces the `Authorization` header** before requests reach managed functions — the SPA therefore authenticates via an `X-Admin-Token` header (checked first server-side; `Authorization: Bearer` still works locally/standalone).
+- Live verification: login/lockout, 281 leads with correct category counts, lead detail, note create/delete — all against production. Smoke user disabled and its sessions removed.
+
 ## Approval record (2026-08-02)
 
 Approved by the user with these calls: **#2 standalone Function App** (future integrations; `deploy-be` target; bearer-token-only API), **#4 self-managed auth**, **#7 list-first layout** (full-width list → detail transition with back link), **#8 deed-ledger visual direction**; dev stays on `/mnt/c` (WSL node v22). Implementation proceeds unattended, tested and verified, **local deploy first** before any Azure deploy. Local API runs are served by a thin Flask adapter over the same handlers (Functions Core Tools not installed locally); the Azure Functions bindings are the production entry point.

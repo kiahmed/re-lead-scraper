@@ -18,6 +18,7 @@
     "react-router-dom": "^7.1.0"
   },
   "devDependencies": {
+    "@azure/static-web-apps-cli": "^2.0.10",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.0",

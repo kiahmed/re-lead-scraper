@@ -28,7 +28,11 @@ export async function api<T>(
   const params = options.query ? '?' + new URLSearchParams(options.query).toString() : ''
   const headers: Record<string, string> = {}
   const token = getToken()
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+    // SWA strips Authorization before managed functions see it
+    headers['X-Admin-Token'] = token
+  }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
 
   const res = await fetch(`${API_BASE}/api/${path}${params}`, {

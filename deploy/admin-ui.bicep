@@ -5,6 +5,11 @@
 param location string = resourceGroup().location
 // Static Web Apps is not offered in eastus — nearest supported region
 param swaLocation string = 'eastus2'
+param apiLocation string = 'eastus2'
+// This subscription currently has 0 quota for Dynamic (Y1) plans in every
+// region, so the API ships as SWA *managed* functions by default. Flip this
+// to true (after a quota increase) to provision the standalone Function App.
+param deployFunctionApp bool = false
 param storageAccountName string = 'releadscraper'
 param staticWebAppName string = 'flynest-admin'
 param functionAppName string = 'flynest-admin-api'
@@ -51,9 +56,9 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
 // ── function app (Linux consumption) ────────────────────────────────────────
 var connectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
 
-resource plan 'Microsoft.Web/serverfarms@2023-01-01' = {
+resource plan 'Microsoft.Web/serverfarms@2023-01-01' = if (deployFunctionApp) {
   name: '${functionAppName}-plan'
-  location: location
+  location: apiLocation
   kind: 'functionapp'
   sku: {
     name: 'Y1'
@@ -64,9 +69,9 @@ resource plan 'Microsoft.Web/serverfarms@2023-01-01' = {
   }
 }
 
-resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
+resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (deployFunctionApp) {
   name: functionAppName
-  location: location
+  location: apiLocation
   kind: 'functionapp,linux'
   properties: {
     serverFarmId: plan.id
@@ -92,4 +97,4 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
 }
 
 output staticWebAppHostname string = staticWebApp.properties.defaultHostname
-output functionAppHostname string = functionApp.properties.defaultHostName
+output functionAppHostname string = deployFunctionApp ? functionApp!.properties.defaultHostName : ''

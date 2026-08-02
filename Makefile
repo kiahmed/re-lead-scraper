@@ -61,10 +61,12 @@ preview: ## Preview the production bundle locally
 deploy-local: build ## Serve built SPA + API from one local server (prod simulation)
 	cd $(API) && python3 dev_server.py --port 7071
 
-deploy-azure: ## Build with the API host baked in, deploy SPA to Azure SWA
-	cd $(UI) && VITE_API_BASE=https://$$(az functionapp show -n $(FUNCAPP) -g $(RG) --query defaultHostName -o tsv) npm run build
-	cd $(UI) && npx @azure/static-web-apps-cli deploy ./dist --env production \
-		--deployment-token $$(az staticwebapp secrets list -n $(SWA_APP) -g $(RG) --query properties.apiKey -o tsv)
+deploy-azure: ## Build SPA and deploy SPA + managed-functions API to SWA
+	cd $(UI) && npm run build
+	cp values.yaml $(API)/values.yaml
+	pip3 install -q --target $(API)/.python_packages/lib/site-packages -r $(API)/requirements.txt
+	cd $(UI) && SWA_CLI_DEPLOYMENT_TOKEN=$$(az staticwebapp secrets list -n $(SWA_APP) -g $(RG) --query properties.apiKey -o tsv) \
+		./node_modules/.bin/swa deploy ./dist --api-location ../$(API) --api-language python --api-version 3.11 --env production
 
 # ---- Backend ----
 
@@ -77,12 +79,10 @@ migrate: ## Ensure admin tables exist (users, sessions, interactions)
 seed: ## Create the local dev admin user (ADMIN_PASSWORD env or prompt)
 	cd $(API) && python3 cli.py create devadmin --display-name "Dev Admin" || true
 
-deploy-be: ## Deploy backend: infra (bicep) + function code (remote build)
+deploy-be: ## Provision Azure infra (SWA Free + admin tables) via bicep
 	az deployment group create -g $(RG) -f deploy/admin-ui.bicep --parameters functionAppName=$(FUNCAPP) staticWebAppName=$(SWA_APP)
-	cd $(API) && rm -f ../artifacts/admin-api.zip && mkdir -p ../artifacts && \
-		zip -qr ../artifacts/admin-api.zip . -x 'tests/*' -x '__pycache__/*' -x 'local.settings.json' && \
-		cp ../values.yaml /tmp/_v.yaml && zip -qj ../artifacts/admin-api.zip /tmp/_v.yaml && \
-		az functionapp deployment source config-zip -g $(RG) -n $(FUNCAPP) --src ../artifacts/admin-api.zip
+	@echo "API code ships together with the SPA: run 'make deploy-azure' (SWA managed functions)."
+	@echo "Standalone Function App (needs Y1 quota): re-run with --parameters deployFunctionApp=true"
 
 # ---- Authentication ----
 

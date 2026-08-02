@@ -6,6 +6,16 @@ from .http import ApiError, ApiRequest
 
 # ── handlers ─────────────────────────────────────────────────────────────────
 def h_health(req: ApiRequest):
+    if req.query.get("debug") == "1":
+        # names only + hash prefix of the received token — never values
+        from . import security
+        token = req.bearer_token()
+        return 200, {
+            "ok": True,
+            "headers": sorted(k.lower() for k in req.headers),
+            "token_len": len(token),
+            "token_hash_prefix": security.token_hash(token)[:12] if token else "",
+        }
     return 200, {"ok": True}
 
 
