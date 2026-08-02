@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { useLeads, type LeadFilters } from '../api/hooks'
+import { useDeleteLead, useLeads, type LeadFilters } from '../api/hooks'
 import { useMeta } from '../api/hooks'
+import type { LeadSummary } from '../api/types'
 import { CategoryChip } from '../components/CategoryChip'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { PencilIcon, TrashIcon } from '../components/Icons'
 import { StatusGlyph } from '../components/StatusGlyph'
 import { fmtDateTime } from '../lib/format'
 
@@ -11,7 +14,9 @@ const DEFAULT_FILTERS: LeadFilters = { q: '', category: '', is_complete: '', pag
 
 export function LeadListPage() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [deleteTarget, setDeleteTarget] = useState<LeadSummary | null>(null)
   const { data, isLoading, isError, error, refetch } = useLeads(filters)
+  const deleteLead = useDeleteLead()
   const meta = useMeta()
   const navigate = useNavigate()
 
@@ -86,11 +91,47 @@ export function LeadListPage() {
               <CategoryChip category={lead.category} />
               <StatusGlyph {...lead} />
               <span className="muted num lead-row-time">{fmtDateTime(lead.stored_at)}</span>
+              <span className="row-actions">
+                <button
+                  className="icon-btn"
+                  aria-label={`Edit lead from ${lead.authorName}`}
+                  title="Edit"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigate(`/leads/${encodeURIComponent(lead.id)}?edit=1`)
+                  }}
+                >
+                  <PencilIcon />
+                </button>
+                <button
+                  className="icon-btn icon-btn-danger"
+                  aria-label={`Delete lead from ${lead.authorName}`}
+                  title="Delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDeleteTarget(lead)
+                  }}
+                >
+                  <TrashIcon />
+                </button>
+              </span>
             </div>
             <p className="lead-row-snippet">{lead.snippet}</p>
           </article>
         ))}
       </div>
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete lead?"
+          message={`This permanently removes the lead from ${deleteTarget.authorName || 'unknown author'} and all its notes. This cannot be undone.`}
+          busy={deleteLead.isPending}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() =>
+            deleteLead.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })
+          }
+        />
+      )}
 
       <div className="list-footer">
         <span className="muted num">

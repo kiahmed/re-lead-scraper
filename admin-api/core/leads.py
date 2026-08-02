@@ -1,7 +1,9 @@
-"""Read-only view over the pipeline's leads table.
+"""Admin view over the pipeline's leads table.
 
-The admin API NEVER writes to `leads` — hub/spokes MERGE-upsert into it
-continuously and admin-originated data lives in `interactions` instead.
+Reads are unrestricted. Writes are limited to an explicit whitelist of
+columns (user-directed edit feature) so pipeline-owned stage columns
+(stored_at/classified_at/outreach_at, keywords, flags) can never be
+clobbered from the UI. Delete removes the lead row AND its interactions.
 """
 import json
 
@@ -9,6 +11,10 @@ from . import tables
 from .http import ApiError
 
 SNIPPET_CHARS = 280
+
+# columns the UI may edit — everything else belongs to the pipeline
+_EDITABLE_TEXT = {"category", "authorName", "groupName", "outreach_message", "investment_summary"}
+_EDITABLE_JSON = {"contact", "extracted_info"}
 
 
 def _parse_json(value, fallback):
@@ -107,3 +113,30 @@ def get_lead(lead_id: str) -> dict:
     if row is None:
         raise ApiError(404, "lead not found")
     return _to_lead(row, full=True)
+
+
+def update_lead(lead_id: str, changes: dict) -> dict:
+    rk = tables.encode_row_key(lead_id)
+    if tables.get_entity(tables.TABLE_LEADS, "filtered", rk) is None:
+        raise ApiError(404, "lead not found")
+    update: dict = {}
+    for key, value in changes.items():
+        if key in _EDITABLE_TEXT:
+            update[key] = "" if value is None else str(value)
+        elif key in _EDITABLE_JSON:
+            update[key] = json.dumps(value) if isinstance(value, (dict, list)) else str(value or "")
+    if not update:
+        raise ApiError(400, f"nothing to update — editable: {sorted(_EDITABLE_TEXT | _EDITABLE_JSON)}")
+    update.update({"PartitionKey": "filtered", "RowKey": rk})
+    tables.upsert(tables.TABLE_LEADS, update)
+    return get_lead(lead_id)
+
+
+def delete_lead(lead_id: str) -> None:
+    rk = tables.encode_row_key(lead_id)
+    if tables.get_entity(tables.TABLE_LEADS, "filtered", rk) is None:
+        raise ApiError(404, "lead not found")
+    # interactions live in a partition keyed by the same encoded id
+    for row in tables.query(tables.TABLE_INTERACTIONS, f"PartitionKey eq '{rk}'"):
+        tables.delete(tables.TABLE_INTERACTIONS, rk, row["RowKey"])
+    tables.delete(tables.TABLE_LEADS, "filtered", rk)

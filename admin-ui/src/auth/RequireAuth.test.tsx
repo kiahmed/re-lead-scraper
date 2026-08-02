@@ -26,7 +26,7 @@ describe('RequireAuth', () => {
   })
 
   it('renders children when a token exists and /auth/me succeeds', async () => {
-    sessionStorage.setItem('soljet_admin_token', 't')
+    sessionStorage.setItem('flynest_admin_token', 't')
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({ username: 'alice', display_name: 'Alice', role: 'admin', is_active: true, last_login_at: '' }), { status: 200 }),
     ))

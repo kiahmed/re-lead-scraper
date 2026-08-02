@@ -6,8 +6,8 @@
 UI      := admin-ui
 API     := admin-api
 RG      := RELeadScraperGroup
-SWA_APP := relead-admin
-FUNCAPP := relead-admin-api
+SWA_APP := flynest-admin
+FUNCAPP := flynest-admin-api
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^# ----/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 8)} /^[a-zA-Z_-]+:.*## / {printf "  \033[32m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -61,7 +61,8 @@ preview: ## Preview the production bundle locally
 deploy-local: build ## Serve built SPA + API from one local server (prod simulation)
 	cd $(API) && python3 dev_server.py --port 7071
 
-deploy-azure: build ## Deploy SPA to Azure Static Web Apps (token fetched fresh)
+deploy-azure: ## Build with the API host baked in, deploy SPA to Azure SWA
+	cd $(UI) && VITE_API_BASE=https://$$(az functionapp show -n $(FUNCAPP) -g $(RG) --query defaultHostName -o tsv) npm run build
 	cd $(UI) && npx @azure/static-web-apps-cli deploy ./dist --env production \
 		--deployment-token $$(az staticwebapp secrets list -n $(SWA_APP) -g $(RG) --query properties.apiKey -o tsv)
 

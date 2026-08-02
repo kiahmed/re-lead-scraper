@@ -15,7 +15,7 @@ function AppHeader() {
 
   return (
     <header className="app-header">
-      <span className="app-mark">◆ SolJet Leads</span>
+      <span className="app-mark">◆ FlyNest Leads Admin</span>
       <span className="header-spacer" />
       {status && (
         <span className={`chip ${status === 'in-sync' ? 'cat-seller-finance' : 'cat-fix-flip'}`}>

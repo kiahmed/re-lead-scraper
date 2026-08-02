@@ -92,3 +92,41 @@ def test_get_missing_lead_404():
     with pytest.raises(ApiError) as e:
         leads.get_lead("nope")
     assert e.value.status == 404
+
+
+def test_update_lead_whitelist():
+    lead_id = seed_lead(1)
+    updated = leads.update_lead(lead_id, {
+        "category": "Seller Finance",
+        "contact": {"author": "Maria", "phone": "555-0100"},
+        "extracted_info": {"loan_balance": 200000},
+        "outreach_message": "edited msg",
+        "stored_at": "2020-01-01",          # pipeline column — must be ignored
+        "is_complete": False,               # pipeline column — must be ignored
+    })
+    assert updated["category"] == "Seller Finance"
+    assert updated["contact"]["phone"] == "555-0100"
+    assert updated["extracted_info"] == {"loan_balance": 200000}
+    assert updated["outreach_message"] == "edited msg"
+    assert updated["stored_at"] == "2026-08-01T09:01:00+00:00"  # untouched
+    assert updated["is_complete"] is True  # untouched
+
+
+def test_update_lead_rejects_empty_and_missing():
+    lead_id = seed_lead(1)
+    with pytest.raises(ApiError):
+        leads.update_lead(lead_id, {"stored_at": "2020-01-01"})
+    with pytest.raises(ApiError):
+        leads.update_lead("nope", {"category": "Hybrid"})
+
+
+def test_delete_lead_removes_row_and_interactions():
+    from core import interactions
+    lead_id = seed_lead(1)
+    interactions.create(lead_id, "alice", {"type": "note", "body": "will vanish"})
+    leads.delete_lead(lead_id)
+    with pytest.raises(ApiError):
+        leads.get_lead(lead_id)
+    assert interactions.list_for_lead(lead_id) == []
+    with pytest.raises(ApiError):
+        leads.delete_lead(lead_id)  # already gone → 404

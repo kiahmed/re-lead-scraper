@@ -3,9 +3,11 @@
 // Deploy once: az deployment group create -g RELeadScraperGroup -f deploy/admin-ui.bicep
 // Content ships separately: make deploy-be (function zip) + make deploy-azure (swa deploy).
 param location string = resourceGroup().location
+// Static Web Apps is not offered in eastus — nearest supported region
+param swaLocation string = 'eastus2'
 param storageAccountName string = 'releadscraper'
-param staticWebAppName string = 'relead-admin'
-param functionAppName string = 'relead-admin-api'
+param staticWebAppName string = 'flynest-admin'
+param functionAppName string = 'flynest-admin-api'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
   name: storageAccountName
@@ -35,7 +37,7 @@ resource interactionsTable 'Microsoft.Storage/storageAccounts/tableServices/tabl
 // ── static web app (Free) — SPA only; API is the standalone function app ────
 resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   name: staticWebAppName
-  location: location
+  location: swaLocation
   sku: {
     name: 'Free'
     tier: 'Free'

@@ -53,6 +53,27 @@ export function useMeta() {
   })
 }
 
+export function usePatchLead(leadId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (changes: Record<string, unknown>) =>
+      api<LeadDetail>(`leads/${encodeURIComponent(leadId)}`, { method: 'PATCH', body: changes }),
+    onSuccess: (updated) => {
+      qc.setQueryData(['lead', leadId], updated)
+      qc.invalidateQueries({ queryKey: ['leads'] })
+    },
+  })
+}
+
+export function useDeleteLead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (leadId: string) =>
+      api<{ ok: boolean }>(`leads/${encodeURIComponent(leadId)}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+  })
+}
+
 export function useAddInteraction(leadId: string) {
   const qc = useQueryClient()
   return useMutation({

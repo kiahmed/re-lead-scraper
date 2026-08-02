@@ -34,6 +34,15 @@ def h_lead_get(req: ApiRequest):
     return 200, leads.get_lead(req.path_params["lead_id"])
 
 
+def h_lead_patch(req: ApiRequest):
+    return 200, leads.update_lead(req.path_params["lead_id"], req.body)
+
+
+def h_lead_delete(req: ApiRequest):
+    leads.delete_lead(req.path_params["lead_id"])
+    return 200, {"ok": True}
+
+
 def h_interactions_list(req: ApiRequest):
     return 200, {"items": interactions.list_for_lead(req.path_params["lead_id"])}
 
@@ -73,6 +82,8 @@ ROUTES = [
     ("GET",    "meta",                                  h_meta,                True),
     ("GET",    "leads",                                 h_leads_list,          True),
     ("GET",    "leads/{lead_id}",                       h_lead_get,            True),
+    ("PATCH",  "leads/{lead_id}",                       h_lead_patch,          True),
+    ("DELETE", "leads/{lead_id}",                       h_lead_delete,         True),
     ("GET",    "leads/{lead_id}/interactions",          h_interactions_list,   True),
     ("POST",   "leads/{lead_id}/interactions",          h_interactions_create, True),
     ("PATCH",  "leads/{lead_id}/interactions/{iid}",    h_interactions_patch,  True),

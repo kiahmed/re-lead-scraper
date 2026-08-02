@@ -43,7 +43,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  sessionStorage.setItem('soljet_admin_token', 'test-token')
+  sessionStorage.setItem('flynest_admin_token', 'test-token')
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     const path = String(url)
     const body = path.includes('/api/meta')
@@ -71,5 +71,30 @@ describe('LeadListPage', () => {
   it('shows the incomplete status glyph', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByTitle('Incomplete')).toBeInTheDocument())
+  })
+})
+
+describe('LeadListPage row actions', () => {
+  it('shows edit and delete buttons per row', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Maria G.')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /Edit lead from Maria G./ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Delete lead from Maria G./ })).toBeInTheDocument()
+  })
+
+  it('delete asks for confirmation and only deletes after confirm', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Maria G.')).toBeInTheDocument())
+    screen.getByRole('button', { name: /Delete lead from Maria G./ }).click()
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>
+    const deletesBefore = fetchMock.mock.calls.filter((c) => c[1]?.method === 'DELETE').length
+    expect(deletesBefore).toBe(0)
+    screen.getByRole('button', { name: 'Delete' }).click()
+    await waitFor(() => {
+      const deletes = fetchMock.mock.calls.filter((c) => c[1]?.method === 'DELETE')
+      expect(deletes.length).toBe(1)
+      expect(String(deletes[0][0])).toContain('/api/leads/facebook_x')
+    })
   })
 })

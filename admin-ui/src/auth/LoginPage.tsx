@@ -29,7 +29,7 @@ export function LoginPage() {
     <div className="login-screen">
       <form className="login-card" onSubmit={onSubmit}>
         <div className="login-mark">◆</div>
-        <h1>SolJet Leads</h1>
+        <h1>FlyNest Leads Admin</h1>
         <p className="eyebrow">Admin sign-in</p>
         <label>
           Username

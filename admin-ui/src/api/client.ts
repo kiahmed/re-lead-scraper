@@ -1,4 +1,7 @@
-const TOKEN_KEY = 'soljet_admin_token'
+const TOKEN_KEY = 'flynest_admin_token'
+// same-origin by default (local + SWA-linked); set VITE_API_BASE for a
+// standalone Function App host in production builds
+const API_BASE: string = import.meta.env.VITE_API_BASE ?? ''
 
 export function getToken(): string {
   return sessionStorage.getItem(TOKEN_KEY) ?? ''
@@ -28,7 +31,7 @@ export async function api<T>(
   if (token) headers['Authorization'] = `Bearer ${token}`
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
 
-  const res = await fetch(`/api/${path}${params}`, {
+  const res = await fetch(`${API_BASE}/api/${path}${params}`, {
     method: options.method ?? 'GET',
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
