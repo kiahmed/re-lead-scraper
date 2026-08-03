@@ -10,7 +10,7 @@ SWA_APP := flynest-admin
 FUNCAPP := flynest-admin-api
 
 help: ## Show this help
-	@awk 'BEGIN {FS = ":.*## "} /^# ----/ {sec = substr($$0, 8); sub(/ -+$$/, "", sec); printf "\n\033[1m%s\033[0m\n", sec} /^[a-zA-Z_-]+:.*## / {desc = $$2; gsub(/[A-Z][A-Z0-9_]*=[^ ,]+/, "\033[38;5;208m&\033[0m", desc); printf "  \033[94m%-16s\033[0m %s\n", $$1, desc}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^# ----/ {sec = substr($$0, 8); sub(/ -+$$/, "", sec); printf "\n\033[1m%s\033[0m\n", sec} /^[a-zA-Z_-]+:.*## / {desc = $$2; gsub(/[A-Za-z][A-Za-z0-9_]*=("[^"]*"|[^ ,]+)/, "\033[38;5;208m&\033[0m", desc); printf "  \033[94m%-16s\033[0m %s\n", $$1, desc}' $(MAKEFILE_LIST)
 
 # ---- Development ----
 
@@ -123,6 +123,59 @@ docker-run: ## Not used — run locally with 'make deploy-local' instead
 publish: deploy-be deploy-azure ## Full production deploy: backend then frontend
 
 .PHONY: help install dev dev-ui watch stop clean test test-py test-ui lint format typecheck \
+	_notmain guard commit push pr ship clean-worktrees \
 	build preview deploy-local deploy-azure run migrate seed deploy-be \
 	create-user disable-user reset-password list-users purge-sessions \
 	package docker-build docker-run publish
+
+# ---- Git workflow ----
+
+# typo guard: any command-line VAR= outside this list fails loudly
+KNOWN_VARS := U m
+# MAKEOVERRIDES splits quoted values on spaces — only words containing '=' are variable assignments
+BAD_VARS := $(filter-out $(KNOWN_VARS),$(foreach o,$(MAKEOVERRIDES),$(if $(findstring =,$(o)),$(firstword $(subst =, ,$(o))))))
+ifneq ($(BAD_VARS),)
+$(error unknown variable(s): $(BAD_VARS) — known: $(KNOWN_VARS))
+endif
+
+_notmain:
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$branch" = "main" ] || [ "$$branch" = "master" ]; then \
+		echo "refusing: on $$branch — create a branch first"; exit 1; fi
+
+guard: ## Scan staged changes for secrets/sensitive files (runs inside commit/ship)
+	@git diff --cached --name-only | grep -E '(^|/)\.env$$|\.pem$$|\.p12$$|local\.settings\.json$$' \
+		&& { echo "guard: sensitive file staged — commit blocked"; exit 1; } || true
+	@! git diff --cached -U0 -- . ':(exclude)Makefile' | grep -nEi 'AccountKey=[A-Za-z0-9+/]{16}|DefaultEndpointsProtocol=http|SharedAccessSignature=[A-Za-z0-9%]|BEGIN (RSA |EC )?PRIVATE KEY' \
+		|| { echo "guard: possible secret in staged diff — commit blocked"; exit 1; }
+	@echo "guard: clean"
+
+commit: _notmain ## make commit m="message" — guarded commit of all changes
+	@test -n "$(m)" || { echo 'usage: make commit m="message"'; exit 1; }
+	@git add -A
+	@$(MAKE) --no-print-directory guard
+	@if git diff --cached --quiet; then echo "nothing to commit"; else git commit -m "$(m)"; fi
+
+push: _notmain ## Push current branch to origin
+	git push -u origin HEAD
+
+pr: _notmain ## Open a draft PR for the current branch (no-op if one exists)
+	-gh pr create --draft --fill 2>/dev/null || echo "PR already exists (or gh unavailable)"
+
+ship: _notmain ## make ship m="msg" — lint+typecheck+tests, guarded commit, push, draft PR
+	@test -n "$(m)" || { echo 'usage: make ship m="message"'; exit 1; }
+	$(MAKE) --no-print-directory lint typecheck test
+	$(MAKE) --no-print-directory commit m="$(m)"
+	$(MAKE) --no-print-directory push
+	$(MAKE) --no-print-directory pr
+
+clean-worktrees: ## Remove .claude/worktrees checkouts (skips current; refuses dirty)
+	@common=$$(git rev-parse --path-format=absolute --git-common-dir); \
+	root=$$(dirname "$$common"); cur=$$(git rev-parse --show-toplevel); \
+	for wt in "$$root"/.claude/worktrees/*/; do \
+		[ -d "$$wt" ] || continue; \
+		wtpath=$$(cd "$$wt" && git rev-parse --show-toplevel 2>/dev/null) || continue; \
+		if [ "$$wtpath" = "$$cur" ]; then echo "skip (current): $$wt"; continue; fi; \
+		if [ -n "$$(git -C "$$wt" status --porcelain 2>/dev/null)" ]; then echo "refuse (dirty): $$wt"; continue; fi; \
+		git worktree remove "$$wt" && echo "removed: $$wt"; \
+	done; git worktree prune
