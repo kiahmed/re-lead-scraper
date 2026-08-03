@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -96,5 +96,30 @@ describe('LeadListPage row actions', () => {
       expect(deletes.length).toBe(1)
       expect(String(deletes[0][0])).toContain('/api/leads/facebook_x')
     })
+  })
+})
+
+describe('date filters', () => {
+  it('presetRange computes windows from local midnight', async () => {
+    const { presetRange } = await import('./LeadListPage')
+    const now = new Date(2026, 7, 2, 15, 30)          // Aug 2 2026, 3:30pm local
+    const midnight = new Date(2026, 7, 2).getTime()
+    expect(presetRange('all', now)).toEqual({ from: '', to: '' })
+    expect(presetRange('today', now).from).toBe(new Date(midnight).toISOString())
+    expect(presetRange('yesterday', now)).toEqual({
+      from: new Date(midnight - 86_400_000).toISOString(),
+      to: new Date(midnight - 1).toISOString(),
+    })
+    expect(presetRange('7d', now).from).toBe(new Date(midnight - 7 * 86_400_000).toISOString())
+  })
+
+  it('renders the preset selector and custom range inputs', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Maria G.')).toBeInTheDocument())
+    const select = screen.getByLabelText('Received date') as HTMLSelectElement
+    expect(select.value).toBe('all')
+    fireEvent.change(select, { target: { value: 'custom' } })
+    expect(screen.getByLabelText('Received from')).toBeInTheDocument()
+    expect(screen.getByLabelText('Received to')).toBeInTheDocument()
   })
 })

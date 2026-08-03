@@ -150,3 +150,22 @@ def test_hub_written_rows_use_raw_rowkey():
     leads.delete_lead(lead_id)
     with pytest.raises(ApiError):
         leads.get_lead(lead_id)
+
+
+def test_date_filters():
+    seed_lead(1)   # stored 2026-08-01T09:01
+    seed_lead(2)   # stored 2026-08-01T09:02
+    tables.upsert(tables.TABLE_LEADS, {
+        "PartitionKey": "filtered", "RowKey": "old-lead", "lead_id": "old-lead",
+        "content": "old one", "keywords": json.dumps([]), "category": "Regular",
+        "stored_at": "2026-05-29T18:23:00Z",   # hub-style 'Z' timestamp
+    })
+    assert leads.list_leads({})["total"] == 3
+    assert leads.list_leads({"from": "2026-08-01"})["total"] == 2
+    assert leads.list_leads({"to": "2026-05-29"})["total"] == 1          # bare date is inclusive
+    assert leads.list_leads({"from": "2026-05-01", "to": "2026-05-31"})["total"] == 1
+    assert leads.list_leads({"from": "2026-08-01T09:01:30+00:00"})["total"] == 1
+    # counts respect the date window too
+    assert leads.list_leads({"from": "2026-08-01"})["counts"] == {"Subject-To": 2}
+    with pytest.raises(ApiError):
+        leads.list_leads({"from": "not-a-date"})

@@ -6,6 +6,7 @@ columns (user-directed edit feature) so pipeline-owned stage columns
 clobbered from the UI. Delete removes the lead row AND its interactions.
 """
 import json
+from datetime import UTC, datetime, timedelta
 
 from . import tables
 from .http import ApiError
@@ -75,6 +76,37 @@ def _matches(lead: dict, category: str, is_complete: str, q: str) -> bool:
     return True
 
 
+def _parse_dt(value: str) -> datetime | None:
+    """Accept full ISO datetimes ('Z' or offset) and bare dates."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise ApiError(400, f"invalid date filter: {value}") from None
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
+def _in_date_range(lead: dict, dt_from: datetime | None, dt_to: datetime | None) -> bool:
+    if dt_from is None and dt_to is None:
+        return True
+    stored = _parse_dt_or_none(lead.get("stored_at", ""))
+    if stored is None:
+        return False
+    if dt_from is not None and stored < dt_from:
+        return False
+    if dt_to is not None and stored > dt_to:
+        return False
+    return True
+
+
+def _parse_dt_or_none(value: str) -> datetime | None:
+    try:
+        return _parse_dt(value)
+    except ApiError:
+        return None
+
+
 def list_leads(query: dict) -> dict:
     rows = tables.query(tables.TABLE_LEADS, "PartitionKey eq 'filtered'")
     all_leads = sorted(
@@ -84,10 +116,17 @@ def list_leads(query: dict) -> dict:
     category = query.get("category", "")
     is_complete = query.get("is_complete", "")
     q = query.get("q", "")
+    dt_from = _parse_dt(query.get("from", ""))
+    dt_to = _parse_dt(query.get("to", ""))
+    if dt_to is not None and "T" not in query.get("to", ""):
+        dt_to = dt_to + timedelta(days=1)  # bare date → inclusive end of day
 
-    # counts by category over the search-filtered (but not category-filtered)
-    # set, so the category tabs always show what's behind them
-    searched = [ld for ld in all_leads if _matches(ld, "", is_complete, q)]
+    # counts by category over the search/date-filtered (but not
+    # category-filtered) set, so the category tabs always show what's behind them
+    searched = [
+        ld for ld in all_leads
+        if _matches(ld, "", is_complete, q) and _in_date_range(ld, dt_from, dt_to)
+    ]
     counts: dict[str, int] = {}
     for lead in searched:
         counts[lead["category"] or "Unclassified"] = counts.get(lead["category"] or "Unclassified", 0) + 1

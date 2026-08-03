@@ -10,10 +10,31 @@ import { PencilIcon, TrashIcon } from '../components/Icons'
 import { StatusGlyph } from '../components/StatusGlyph'
 import { fmtDateTime } from '../lib/format'
 
-const DEFAULT_FILTERS: LeadFilters = { q: '', category: '', is_complete: '', page: 1, pageSize: 25 }
+const DEFAULT_FILTERS: LeadFilters = {
+  q: '', category: '', is_complete: '', from: '', to: '', page: 1, pageSize: 25,
+}
+
+export type DatePreset = 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'custom'
+
+/** Preset windows on the "Received & passed filter" timestamp (stored_at),
+ * computed from local midnight so "Today" matches the user's calendar. */
+export function presetRange(preset: DatePreset, now = new Date()): { from: string; to: string } {
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const days = (n: number) => new Date(midnight.getTime() - n * 86_400_000)
+  switch (preset) {
+    case 'today': return { from: midnight.toISOString(), to: '' }
+    case 'yesterday': return { from: days(1).toISOString(), to: new Date(midnight.getTime() - 1).toISOString() }
+    case '7d': return { from: days(7).toISOString(), to: '' }
+    case '30d': return { from: days(30).toISOString(), to: '' }
+    default: return { from: '', to: '' }
+  }
+}
 
 export function LeadListPage() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [preset, setPreset] = useState<DatePreset>('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<LeadSummary | null>(null)
   const { data, isLoading, isError, error, refetch } = useLeads(filters)
   const deleteLead = useDeleteLead()
@@ -25,6 +46,21 @@ export function LeadListPage() {
 
   function set(partial: Partial<LeadFilters>) {
     setFilters((f) => ({ ...f, page: 1, ...partial }))
+  }
+
+  function applyPreset(next: DatePreset) {
+    setPreset(next)
+    if (next === 'custom') {
+      set({ from: customFrom, to: customTo })
+    } else {
+      set(presetRange(next))
+    }
+  }
+
+  function applyCustom(from: string, to: string) {
+    setCustomFrom(from)
+    setCustomTo(to)
+    set({ from, to })  // bare dates — API treats `to` as inclusive end of day
   }
 
   return (
@@ -46,6 +82,37 @@ export function LeadListPage() {
           <option value="true">Complete</option>
           <option value="false">Incomplete</option>
         </select>
+        <select
+          className="input"
+          value={preset}
+          onChange={(e) => applyPreset(e.target.value as DatePreset)}
+          aria-label="Received date"
+        >
+          <option value="all">All time</option>
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+          <option value="custom">Custom range…</option>
+        </select>
+        {preset === 'custom' && (
+          <>
+            <input
+              className="input"
+              type="date"
+              value={customFrom}
+              onChange={(e) => applyCustom(e.target.value, customTo)}
+              aria-label="Received from"
+            />
+            <input
+              className="input"
+              type="date"
+              value={customTo}
+              onChange={(e) => applyCustom(customFrom, e.target.value)}
+              aria-label="Received to"
+            />
+          </>
+        )}
         <button className="btn" onClick={() => refetch()}>Refresh</button>
       </div>
 

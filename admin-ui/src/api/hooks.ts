@@ -7,6 +7,8 @@ export interface LeadFilters {
   q: string
   category: string
   is_complete: string
+  from: string
+  to: string
   page: number
   pageSize: number
 }
@@ -20,6 +22,8 @@ export function useLeads(filters: LeadFilters) {
           q: filters.q,
           category: filters.category,
           is_complete: filters.is_complete,
+          from: filters.from,
+          to: filters.to,
           page: String(filters.page),
           pageSize: String(filters.pageSize),
         },
