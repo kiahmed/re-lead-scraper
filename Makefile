@@ -10,7 +10,7 @@ SWA_APP := flynest-admin
 FUNCAPP := flynest-admin-api
 
 help: ## Show this help
-	@awk 'BEGIN {FS = ":.*## "} /^# ----/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 8)} /^[a-zA-Z_-]+:.*## / {printf "  \033[32m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^# ----/ {sec = substr($$0, 8); sub(/ -+$$/, "", sec); printf "\n\033[1m%s\033[0m\n", sec} /^[a-zA-Z_-]+:.*## / {desc = $$2; gsub(/[A-Z][A-Z0-9_]*=[^ ,]+/, "\033[38;5;208m&\033[0m", desc); printf "  \033[94m%-16s\033[0m %s\n", $$1, desc}' $(MAKEFILE_LIST)
 
 # ---- Development ----
 
