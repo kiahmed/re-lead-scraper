@@ -18,7 +18,7 @@ install: ## Install UI deps (API uses system python3 + admin-api/requirements.tx
 	cd $(UI) && npm install --no-audit --no-fund
 	pip3 install -r $(API)/requirements.txt
 
-dev: ## Run Vite dev server + local API together (hot reload both sides)
+dev: ## Code mode: Vite hot reload (:5173) + local API (:7071)
 	$(MAKE) -j2 dev-ui run
 
 dev-ui: ## Vite dev server only (proxies /api → :7071)
@@ -63,7 +63,7 @@ build: ## Production build (typecheck + vite build → admin-ui/dist)
 preview: ## Preview the production bundle locally
 	cd $(UI) && npm run preview
 
-deploy-local: build ## Serve built SPA + API from one local server (prod simulation)
+deploy-local: build ## Prod simulation: built SPA + API served together on :7071 (like Azure)
 	cd $(API) && python3 dev_server.py --port 7071
 
 deploy-azure: ## Build SPA and deploy SPA + managed-functions API to SWA
@@ -75,7 +75,7 @@ deploy-azure: ## Build SPA and deploy SPA + managed-functions API to SWA
 
 # ---- Backend ----
 
-run: ## Run the local API (Flask adapter over the same handlers as Azure)
+run: ## API only on :7071 (Flask adapter, no UI)
 	cd $(API) && python3 dev_server.py --port 7071
 
 migrate: ## Ensure admin tables exist (users, sessions, interactions)
