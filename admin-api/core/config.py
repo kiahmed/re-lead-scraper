@@ -16,7 +16,14 @@ def _candidate_env_files():
     if explicit:
         yield Path(explicit)
     yield Path.cwd() / ".env"
-    yield Path(__file__).resolve().parents[2] / ".env"
+    repo_root = Path(__file__).resolve().parents[2]
+    yield repo_root / ".env"
+    # inside a git worktree (<main>/.claude/worktrees/<name>) fall back to
+    # the main checkout's .env, which deploy.py keeps up to date
+    parts = repo_root.parts
+    if ".claude" in parts:
+        main_root = Path(*parts[: parts.index(".claude")])
+        yield main_root / ".env"
 
 
 def _load_env_file() -> None:

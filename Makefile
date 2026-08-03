@@ -27,6 +27,11 @@ dev-ui: ## Vite dev server only (proxies /api → :7071)
 watch: ## Continuous typecheck feedback (Vite already hot-reloads)
 	cd $(UI) && npx tsc --noEmit --watch
 
+stop: ## Stop any running local API/UI dev servers
+	-pkill -f "dev_server.py" 2>/dev/null || true
+	-pkill -f "vite" 2>/dev/null || true
+	@echo "local servers stopped"
+
 clean: ## Remove build output and caches
 	rm -rf $(UI)/dist $(UI)/node_modules/.vite artifacts
 	find $(API) -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
@@ -117,7 +122,7 @@ docker-run: ## Not used — run locally with 'make deploy-local' instead
 
 publish: deploy-be deploy-azure ## Full production deploy: backend then frontend
 
-.PHONY: help install dev dev-ui watch clean test test-py test-ui lint format typecheck \
+.PHONY: help install dev dev-ui watch stop clean test test-py test-ui lint format typecheck \
 	build preview deploy-local deploy-azure run migrate seed deploy-be \
 	create-user disable-user reset-password list-users purge-sessions \
 	package docker-build docker-run publish
