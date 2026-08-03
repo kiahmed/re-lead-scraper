@@ -1,0 +1,53 @@
+/* Deed-ledger design tokens — light theme only */
+:root {
+  /* paper */
+  --bg: #fcfcfb;
+  --surface: #ffffff;
+  --border: #e4e4de;
+  --border-strong: #cfcfc6;
+
+  /* ink */
+  --ink: #1c1e21;
+  --ink-2: #5a5f66;
+  --ink-3: #8a8f96;
+
+  /* accent — title-company pine green */
+  --accent: #1e5a48;
+  --accent-hover: #17473a;
+  --accent-soft: #e7f0ec;
+
+  /* semantic */
+  --ok: #1e7a4d;
+  --ok-bg: #e6f3ec;
+  --warn: #9a6b00;
+  --warn-bg: #fbf3dc;
+  --err: #b3352c;
+  --err-bg: #fbebe9;
+
+  /* category hues (chip text on tinted bg, AA on white) */
+  --cat-subject-to: #3d4a9e;      --cat-subject-to-bg: #e9ebf8;
+  --cat-seller-finance: #0f6e6a;  --cat-seller-finance-bg: #e2f2f1;
+  --cat-hybrid: #6a3fa0;          --cat-hybrid-bg: #f0e9f9;
+  --cat-fix-flip: #8a5a00;        --cat-fix-flip-bg: #f8efdc;
+  --cat-jv-wholesale: #97431e;    --cat-jv-wholesale-bg: #f9eae2;
+  --cat-buyers-looking: #1a5e8a;  --cat-buyers-looking-bg: #e4f0f8;
+  --cat-regular: #4a5560;         --cat-regular-bg: #eaeef1;
+  --cat-others: #6b6f74;          --cat-others-bg: #efefed;
+
+  /* type */
+  --font-ui: 'Public Sans', 'Instrument Sans', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --fs-label: 12px;
+  --fs-ui: 13px;
+  --fs-read: 15px;
+  --fs-title: 17px;
+  --fs-stat: 22px;
+
+  /* rhythm */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --radius: 6px;
+}

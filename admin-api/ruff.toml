@@ -1,0 +1,9 @@
+line-length = 110
+target-version = "py311"
+
+[lint]
+# E/F pyflakes+pycodestyle, I import order, UP modernize, B bugbear.
+# Blind-except rules (BLE/S110) are intentionally excluded: table access and
+# the route dispatcher swallow exceptions by design (fault tolerance mirrors
+# src/agents/table_store.py; the dispatcher must never leak stack traces).
+select = ["E", "F", "I", "UP", "B"]
