@@ -130,3 +130,23 @@ def test_delete_lead_removes_row_and_interactions():
     assert interactions.list_for_lead(lead_id) == []
     with pytest.raises(ApiError):
         leads.delete_lead(lead_id)  # already gone → 404
+
+
+def test_hub_written_rows_use_raw_rowkey():
+    """The hub Logic App stores the RAW lead id as RowKey (no url-encoding);
+    lookup, update, and delete must resolve both schemes."""
+    lead_id = "facebook_hubrow+9=="
+    tables.upsert(tables.TABLE_LEADS, {
+        "PartitionKey": "filtered",
+        "RowKey": lead_id,                      # raw — as the hub writes it
+        "lead_id": lead_id,
+        "content": "hub-written row",
+        "keywords": json.dumps([]),
+        "category": "Seller Finance",
+        "stored_at": "2026-08-01T10:00:00+00:00",
+    })
+    assert leads.get_lead(lead_id)["content"] == "hub-written row"
+    assert leads.update_lead(lead_id, {"groupName": "G"})["groupName"] == "G"
+    leads.delete_lead(lead_id)
+    with pytest.raises(ApiError):
+        leads.get_lead(lead_id)

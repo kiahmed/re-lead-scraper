@@ -108,17 +108,24 @@ def list_leads(query: dict) -> dict:
     }
 
 
+def _find_row(lead_id: str) -> tuple[str, dict]:
+    """The leads table mixes two RowKey schemes: the local pipeline stores
+    quote(lead_id) but the hub Logic App stores the raw id (legal in Azure
+    Tables). Try both; return (rowkey, row) or raise 404."""
+    for rk in (tables.encode_row_key(lead_id), lead_id):
+        row = tables.get_entity(tables.TABLE_LEADS, "filtered", rk)
+        if row is not None:
+            return rk, row
+    raise ApiError(404, "lead not found")
+
+
 def get_lead(lead_id: str) -> dict:
-    row = tables.get_entity(tables.TABLE_LEADS, "filtered", tables.encode_row_key(lead_id))
-    if row is None:
-        raise ApiError(404, "lead not found")
+    _, row = _find_row(lead_id)
     return _to_lead(row, full=True)
 
 
 def update_lead(lead_id: str, changes: dict) -> dict:
-    rk = tables.encode_row_key(lead_id)
-    if tables.get_entity(tables.TABLE_LEADS, "filtered", rk) is None:
-        raise ApiError(404, "lead not found")
+    rk, _ = _find_row(lead_id)
     update: dict = {}
     for key, value in changes.items():
         if key in _EDITABLE_TEXT:
@@ -133,10 +140,10 @@ def update_lead(lead_id: str, changes: dict) -> dict:
 
 
 def delete_lead(lead_id: str) -> None:
-    rk = tables.encode_row_key(lead_id)
-    if tables.get_entity(tables.TABLE_LEADS, "filtered", rk) is None:
-        raise ApiError(404, "lead not found")
-    # interactions live in a partition keyed by the same encoded id
-    for row in tables.query(tables.TABLE_INTERACTIONS, f"PartitionKey eq '{rk}'"):
-        tables.delete(tables.TABLE_INTERACTIONS, rk, row["RowKey"])
+    rk, _ = _find_row(lead_id)
+    # interactions are always keyed by the encoded id, independent of which
+    # RowKey scheme the lead row itself uses
+    ipk = tables.encode_row_key(lead_id)
+    for row in tables.query(tables.TABLE_INTERACTIONS, f"PartitionKey eq '{ipk}'"):
+        tables.delete(tables.TABLE_INTERACTIONS, ipk, row["RowKey"])
     tables.delete(tables.TABLE_LEADS, "filtered", rk)

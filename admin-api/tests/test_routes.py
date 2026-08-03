@@ -16,7 +16,8 @@ def _login() -> str:
 
 
 def test_health_is_anonymous():
-    assert dispatch(_req(), "health") == (200, {"ok": True})
+    status, body = dispatch(_req(), "health")
+    assert (status, body["ok"]) == (200, True)
 
 
 def test_protected_routes_require_token():
@@ -65,3 +66,27 @@ def test_internal_errors_do_not_leak_details(monkeypatch):
     status, body = dispatch(_req(token=token), "boom")
     assert status == 500
     assert "xyz" not in str(body)
+
+
+def test_encoded_path_params_are_normalized():
+    """Azure Functions passes %-encoded route segments through undecoded;
+    the dispatcher must handle both encoded and decoded forms."""
+    import json as _json
+
+    from core import tables
+    token = _login()
+    lead_id = "facebook_lead+1=="
+    tables.upsert(tables.TABLE_LEADS, {
+        "PartitionKey": "filtered",
+        "RowKey": tables.encode_row_key(lead_id),
+        "lead_id": lead_id,
+        "content": "padded id lead",
+        "stored_at": "2026-08-01T09:00:00+00:00",
+        "keywords": _json.dumps([]),
+    })
+    encoded = "facebook_lead%2B1%3D%3D"   # what Azure delivers
+    decoded = lead_id                      # what Flask delivers
+    for variant in (encoded, decoded):
+        status, body = dispatch(_req(token=token), f"leads/{variant}")
+        assert status == 200, variant
+        assert body["content"] == "padded id lead"

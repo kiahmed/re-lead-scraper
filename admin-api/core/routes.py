@@ -1,10 +1,14 @@
 """Route table + tiny dispatcher shared by the Azure Functions entry point
 and the Flask dev server. Paths are segment patterns; `{name}` captures."""
+from urllib.parse import unquote
+
 from . import auth, interactions, leads, meta, users
 from .http import ApiError, ApiRequest
 
-
 # ── handlers ─────────────────────────────────────────────────────────────────
+API_VERSION = "2026-08-02.4"
+
+
 def h_health(req: ApiRequest):
     if req.query.get("debug") == "1":
         # names only + hash prefix of the received token — never values
@@ -16,7 +20,7 @@ def h_health(req: ApiRequest):
             "token_len": len(token),
             "token_hash_prefix": security.token_hash(token)[:12] if token else "",
         }
-    return 200, {"ok": True}
+    return 200, {"ok": True, "version": API_VERSION}
 
 
 def h_login(req: ApiRequest):
@@ -128,7 +132,10 @@ def dispatch(req: ApiRequest, path: str) -> tuple[int, dict]:
         matched_path = True
         if method != req.method:
             continue
-        req.path_params = params
+        # Flask decodes %-escapes in path segments, Azure Functions does not —
+        # normalize so lead ids with base64 padding (%3D etc.) work on both.
+        # Safe to apply twice: decoded ids never contain '%'.
+        req.path_params = {k: unquote(v) for k, v in params.items()}
         try:
             if needs_auth:
                 req.user = auth.validate_token(req.bearer_token())
