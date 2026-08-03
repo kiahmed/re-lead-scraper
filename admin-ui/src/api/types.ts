@@ -16,6 +16,7 @@ export interface LeadSummary {
 }
 
 export interface LeadDetail extends Omit<LeadSummary, 'snippet'> {
+  url: string
   content: string
   contact: { author?: string; email?: string | null; phone?: string | null; dm_requested?: boolean }
   extracted_info: Record<string, unknown> | string

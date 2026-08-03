@@ -34,6 +34,22 @@ export function fmtValue(value: unknown): string {
   return String(value)
 }
 
+/** Facebook post URL: stored url when present, else derived from the lead id
+ * (base64 "S:_I<authorId>:VK:<postId>" → story.php permalink). */
+export function postUrl(lead: { url?: string; id: string }): string {
+  if (lead.url) return lead.url
+  const m = lead.id.match(/^facebook_(.+)$/)
+  if (!m) return ''
+  try {
+    const decoded = atob(m[1])
+    const parts = decoded.match(/^S:_I(\d+):VK:(\d+)$/)
+    if (!parts) return ''
+    return `https://www.facebook.com/story.php?story_fbid=${parts[2]}&id=${parts[1]}`
+  } catch {
+    return ''
+  }
+}
+
 const CATEGORY_CLASS: Record<string, string> = {
   'Subject-To': 'subject-to',
   'Seller Finance': 'seller-finance',

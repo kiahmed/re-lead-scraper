@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 import type { LeadDetail } from '../../api/types'
 import { Section } from '../../components/Section'
-import { fmtDateTime, fmtValue, humanizeKey } from '../../lib/format'
+import { fmtDateTime, fmtValue, humanizeKey, postUrl } from '../../lib/format'
 
 function AttributeList({ lead }: { lead: LeadDetail }) {
   const info = lead.extracted_info
@@ -48,7 +48,9 @@ export function DealPane({ lead }: { lead: LeadDetail }) {
           {lead.keywords.map((k) => (
             <span className="chip cat-others" key={k}>{k}</span>
           ))}
-          <span className="mono">{lead.id}</span>
+          {postUrl(lead)
+            ? <a href={postUrl(lead)} target="_blank" rel="noopener noreferrer">View original post ↗</a>
+            : <span className="mono">{lead.id}</span>}
           <span className="num">{fmtDateTime(lead.stored_at)}</span>
         </div>
       </Section>

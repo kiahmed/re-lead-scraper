@@ -46,6 +46,7 @@ def _to_lead(row: dict, full: bool = False) -> dict:
     }
     if full:
         lead.update({
+            "url": row.get("url", ""),
             "content": content,
             "contact": _parse_json(row.get("contact"), {}),
             "extracted_info": _parse_json(row.get("extracted_info"), row.get("extracted_info", "")),

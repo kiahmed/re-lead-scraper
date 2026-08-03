@@ -169,3 +169,13 @@ def test_date_filters():
     assert leads.list_leads({"from": "2026-08-01"})["counts"] == {"Subject-To": 2}
     with pytest.raises(ApiError):
         leads.list_leads({"from": "not-a-date"})
+
+
+def test_url_surfaced_in_detail():
+    lead_id = seed_lead(1)
+    assert leads.get_lead(lead_id)["url"] == ""   # column absent → empty
+    tables.upsert(tables.TABLE_LEADS, {
+        "PartitionKey": "filtered", "RowKey": tables.encode_row_key(lead_id),
+        "url": "https://www.facebook.com/groups/g/posts/123/",
+    })
+    assert leads.get_lead(lead_id)["url"] == "https://www.facebook.com/groups/g/posts/123/"
