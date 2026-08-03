@@ -169,9 +169,13 @@ ship: _notmain ## make ship m="msg" — lint+typecheck+tests, guarded commit, pu
 	$(MAKE) --no-print-directory push
 	$(MAKE) --no-print-directory pr
 
-clean-worktrees: ## Remove .claude/worktrees checkouts (skips current; refuses dirty)
+clean-worktrees: ## Sync main checkout (ff pull), then remove .claude/worktrees checkouts (skips current; refuses dirty)
 	@common=$$(git rev-parse --path-format=absolute --git-common-dir); \
 	root=$$(dirname "$$common"); cur=$$(git rev-parse --show-toplevel); \
+	git fetch -q origin; \
+	if [ -z "$$(git -C "$$root" status --porcelain)" ]; then \
+		git -C "$$root" pull --ff-only -q && echo "main checkout updated"; \
+	else echo "main checkout has local changes — pull skipped"; fi; \
 	for wt in "$$root"/.claude/worktrees/*/; do \
 		[ -d "$$wt" ] || continue; \
 		wtpath=$$(cd "$$wt" && git rev-parse --show-toplevel 2>/dev/null) || continue; \
