@@ -173,9 +173,14 @@ clean-worktrees: ## Sync main checkout (ff pull), remove .claude/worktrees check
 	@common=$$(git rev-parse --path-format=absolute --git-common-dir); \
 	root=$$(dirname "$$common"); cur=$$(git rev-parse --show-toplevel); \
 	git fetch -q origin; \
+	mk_before=$$(git -C "$$root" rev-parse HEAD:Makefile 2>/dev/null); \
 	if [ -z "$$(git -C "$$root" status --porcelain)" ]; then \
 		git -C "$$root" pull --ff-only -q && echo "main checkout updated"; \
 	else echo "main checkout has local changes — pull skipped"; fi; \
+	mk_after=$$(git -C "$$root" rev-parse HEAD:Makefile 2>/dev/null); \
+	if [ "$$mk_before" != "$$mk_after" ] && [ -z "$$CW_REEXEC" ]; then \
+		echo "Makefile changed by pull — restarting with the new version"; \
+		cd "$$root" && CW_REEXEC=1 exec $(MAKE) --no-print-directory clean-worktrees $(if $(filter 1,$(FORCE)),FORCE=1); fi; \
 	for wt in "$$root"/.claude/worktrees/*/; do \
 		[ -d "$$wt" ] || continue; \
 		wt=$${wt%/}; \
@@ -185,6 +190,9 @@ clean-worktrees: ## Sync main checkout (ff pull), remove .claude/worktrees check
 			rm -rf "$$wt"; continue; fi; \
 		if ! git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
 			echo "broken (unreadable .git): deleting $$wt"; rm -rf "$$wt"; continue; fi; \
+		lockpid=$$(git worktree list --porcelain | awk -v w="$$wt" '$$1=="worktree"{c=$$2} c==w && $$1=="locked"{for(i=1;i<=NF;i++) if($$i~/(^|\()pid$$/){gsub(/[^0-9]/,"",$$(i+1)); print $$(i+1); exit}}'); \
+		if [ -n "$$lockpid" ] && kill -0 "$$lockpid" 2>/dev/null; then \
+			echo "skip (in use by live session, pid $$lockpid): $$wt"; continue; fi; \
 		br=$$(git -C "$$wt" rev-parse --abbrev-ref HEAD 2>/dev/null); \
 		st=$$(git -C "$$wt" status --porcelain 2>/dev/null); \
 		if [ -n "$$st" ] && [ "$(FORCE)" != "1" ]; then \
