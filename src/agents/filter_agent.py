@@ -15,20 +15,23 @@ import yaml
 _CONFIG_PATH = Path(__file__).parent.parent.parent / "values.yaml"
 
 
-def _load_filter_config() -> tuple[set[str], re.Pattern, re.Pattern]:
+def _load_filter_config() -> tuple[bool, set[str], re.Pattern, re.Pattern]:
     with open(_CONFIG_PATH) as f:
-        cfg = yaml.safe_load(f)["filter"]
+        cfg = yaml.safe_load(f)
 
-    cities = {c.lower() for c in cfg["cities"]}
+    enabled = cfg.get("hub", {}).get("filter_enabled", True)
+
+    filter_cfg = cfg["filter"]
+    cities = {c.lower() for c in filter_cfg["cities"]}
     hoa_zero = re.compile(
-        "|".join(cfg["hoa_zero_patterns"]),
+        "|".join(filter_cfg["hoa_zero_patterns"]),
         re.IGNORECASE,
     )
     hoa_present = re.compile(r"\bhoa\b", re.IGNORECASE)
-    return cities, hoa_zero, hoa_present
+    return enabled, cities, hoa_zero, hoa_present
 
 
-_CITY_KEYWORDS, _HOA_ZERO_PATTERNS, _HOA_PRESENT = _load_filter_config()
+_FILTER_ENABLED, _CITY_KEYWORDS, _HOA_ZERO_PATTERNS, _HOA_PRESENT = _load_filter_config()
 
 
 def _safe_str(value, fallback: str = "") -> str:
@@ -69,6 +72,20 @@ def filter_leads(leads: list[dict]) -> list[dict]:
     if not isinstance(leads, list):
         print(f"[filter] expected a list of leads, got {type(leads).__name__} — returning empty")
         return []
+
+    if not _FILTER_ENABLED:
+        print("[filter] filter_enabled=false — bypassing city/HOA filter, passing all leads through")
+        # Still validate structure: must be a dict with an id
+        valid = []
+        for i, lead in enumerate(leads):
+            if not isinstance(lead, dict):
+                print(f"[filter] lead[{i}] is not a dict ({type(lead).__name__}) — skipping")
+                continue
+            if not lead.get("id"):
+                print(f"[filter] lead[{i}] missing 'id' — skipping")
+                continue
+            valid.append(lead)
+        return valid
 
     passing = []
     for i, lead in enumerate(leads):

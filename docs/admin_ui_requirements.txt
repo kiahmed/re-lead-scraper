@@ -1,0 +1,182 @@
+Here's a tighter and more structured version that an AI coding agent or engineer can execute:
+
+---
+
+I'd like you to build a modern **Admin UI** for this project, similar in scope to the admin interface we built for:
+
+`/mnt/c/soljet_dev/ai_stack_development/arboryx-admin`
+
+However, **do not reuse its design language, layout, typography, or styling.** Treat it only as a reference for overall functionality and project organization.
+
+## Frontend & Hosting
+
+Please first evaluate whether **Azure Static Web Apps** is the best deployment target for this project. Ideally, I'd like to build the frontend using a modern SPA framework such as **React** (preferred), although I'm also open to Vue or another mature framework if you believe it offers significant advantages.
+
+The application should support:
+
+* Local development with hot reload
+* Component testing
+* Production builds
+* Simple Azure deployment
+* Clean project structure
+* Excellent long-term maintainability
+
+If Azure Static Web Apps is not the right choice, recommend the most cost-effective Azure-native alternative capable of hosting a modern SPA while remaining inexpensive (ideally free during development).
+
+## Design
+
+The UI should be lightweight, modern, responsive, and suitable for the real estate industry.
+
+Design goals:
+
+* Light theme
+* Excellent color contrast
+* Highly readable labels and text
+* Clean spacing
+* Minimalistic without looking generic
+* Fast and responsive
+* No unnecessary animations
+* Professional dashboard feel
+
+## Authentication
+
+Implement **sign-in only**.
+
+There should be:
+
+* No public sign-up page
+* No self-registration
+
+Users will be provisioned exclusively by the backend (via Make targets or administrative tools).
+
+## Backend
+
+If appropriate, create a dedicated **Users** table within the existing `releadscraper` storage.
+
+Create lightweight CRUD endpoints/functions for:
+
+* Users
+* Authentication
+* Sessions
+* Future administration
+
+Keep these functions modular and independent.
+
+## Main Admin Experience
+
+The application should remain a **single-page application**.
+
+I envision a split-pane workflow:
+
+**Left pane**
+
+* Original listing/post
+* Property information
+* Metadata
+* Extracted attributes
+* Investment analysis
+
+**Right pane**
+
+* Communication history
+* Messages
+* Follow-ups
+* Notes
+* Timeline of interactions
+
+Only the individual panes should scroll when necessary. The application itself should remain fixed without the entire page scrolling.
+
+## Development Process
+
+Before writing any implementation code, assemble a **multi-agent planning team** to analyze the project from different perspectives, including:
+
+* Frontend architecture
+* Backend/API
+* Azure hosting
+* UX/UI
+* Authentication
+* Storage
+* Performance
+* Maintainability
+* Testing
+* Deployment
+
+After completing the analysis, produce:
+
+1. High-level architecture
+2. Technology recommendations
+3. UI wireframe/layout proposal
+4. Deployment strategy
+5. Directory structure
+6. API design
+7. Component hierarchy
+8. Authentication flow
+9. Testing strategy
+10. Risk assessment
+11. Future extensibility
+
+Save the implementation proposal under the project's `docs/` directory for review.
+
+Do **not** begin implementation until the proposal has been reviewed and approved.
+
+## Implementation Phase
+
+After approval:
+
+* Implement incrementally
+* Test each completed phase
+* Simulate both local and Azure deployments
+* Verify all functionality before moving to the next phase
+
+Deployment should support both:
+
+* Local development
+* Azure production
+
+## Build System
+
+Expand the existing Makefile by organizing commands into logical categories.
+
+Include useful targets for:
+
+### Development
+
+* install
+* dev
+* watch
+* clean
+
+### Testing
+
+* test
+* lint
+* format
+* typecheck
+
+### Frontend
+
+* build
+* preview
+* deploy-local
+* deploy-azure
+
+### Backend
+
+* run
+* migrate
+* seed
+
+### Authentication
+
+* create-user
+* disable-user
+* reset-password
+
+### Deployment
+
+* package
+* docker-build
+* docker-run
+* publish
+
+Follow the same philosophy as the reference project while improving consistency and organization where appropriate.

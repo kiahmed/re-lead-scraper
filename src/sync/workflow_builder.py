@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 import yaml
 from src.agents.classifier_agent import _build_system_prompt, _build_tool as _build_classify_tool
+from src.agents.outreach.base import build_media_instruction
 
 _VALUES_PATH = ROOT / "values.yaml"
 _WORKFLOWS_DIR = ROOT / "deploy" / "workflows"
@@ -130,32 +131,37 @@ def _load_values() -> dict:
 # ── Hub workflow ──────────────────────────────────────────────────────────────
 def _build_hub_workflow(cfg: dict) -> dict:
     hub_cfg = cfg.get("hub", {})
+    filter_enabled         = hub_cfg.get("filter_enabled", True)
     classify_batch_size    = hub_cfg.get("classify_batch_size", 3)
     spoke_interval_seconds = hub_cfg.get("spoke_interval_seconds", 10)
     classifier_cfg = cfg["classifier"]
     system_prompt = _build_system_prompt(classifier_cfg)
     tool_declaration = _build_classify_tool(classifier_cfg)
 
-    # Build city filter dynamically from values.yaml — covers all configured cities
-    cities = cfg.get("filter", {}).get("cities", ["atlanta"])
-    city_checks = ",".join(
-        f"contains(toLower(string(item()?['keywords'])),'{c.lower()}')"
-        for c in cities
-    )
-    filter_where = (
-        f"@and("
-        f"or({city_checks}),"
-        "or("
-        "not(contains(toLower(item()?['content']),'hoa')),"
-        "contains(toLower(replace(item()?['content'],' ','')),concat('hoa:$0')),"
-        "contains(toLower(replace(item()?['content'],' ','')),concat('hoa=$0')),"
-        "contains(toLower(replace(item()?['content'],' ','')),concat('hoa:0')),"
-        "contains(toLower(replace(item()?['content'],' ','')),concat('hoa=0')),"
-        "contains(toLower(item()?['content']),'no hoa'),"
-        "contains(toLower(item()?['content']),'hoa none')"
-        ")"
-        ")"
-    )
+    if filter_enabled:
+        # Build city filter dynamically from values.yaml — covers all configured cities
+        cities = cfg.get("filter", {}).get("cities", ["atlanta"])
+        city_checks = ",".join(
+            f"contains(toLower(string(item()?['keywords'])),'{c.lower()}')"
+            for c in cities
+        )
+        filter_where = (
+            f"@and("
+            f"or({city_checks}),"
+            "or("
+            "not(contains(toLower(item()?['content']),'hoa')),"
+            "contains(toLower(replace(item()?['content'],' ','')),concat('hoa:$0')),"
+            "contains(toLower(replace(item()?['content'],' ','')),concat('hoa=$0')),"
+            "contains(toLower(replace(item()?['content'],' ','')),concat('hoa:0')),"
+            "contains(toLower(replace(item()?['content'],' ','')),concat('hoa=0')),"
+            "contains(toLower(item()?['content']),'no hoa'),"
+            "contains(toLower(item()?['content']),'hoa none')"
+            ")"
+            ")"
+        )
+    else:
+        # filter_enabled=false — pass all leads through (always-true condition)
+        filter_where = "@true"
 
     gemini_payload = {
         "system_instruction": {"parts": [{"text": system_prompt}]},
@@ -207,7 +213,9 @@ def _build_hub_workflow(cfg: dict) -> dict:
                                         "content":     {"type": "string"},
                                         "keywords":    {"type": "array", "items": {"type": "string"}},
                                         "authorName":  {"type": "string"},
-                                        "groupName":   {"type": "string"}
+                                        "groupName":   {"type": "string"},
+                                        "hasImages":   {"type": "boolean"},
+                                        "hasVideos":   {"type": "boolean"}
                                     }
                                 }
                             }
@@ -250,6 +258,8 @@ def _build_hub_workflow(cfg: dict) -> dict:
                                         "groupName":  "@{coalesce(items('For_Each_Filtered_Lead')?['groupName'], '')}",
                                         "keywords":   "@{string(items('For_Each_Filtered_Lead')?['keywords'])}",
                                         "url":        "@{coalesce(items('For_Each_Filtered_Lead')?['url'], '')}",
+                                        "hasImages":  "@{coalesce(items('For_Each_Filtered_Lead')?['hasImages'], false)}",
+                                        "hasVideos":  "@{coalesce(items('For_Each_Filtered_Lead')?['hasVideos'], false)}",
                                         "stored_at":  "@{utcNow()}"
                                     }
                                 },
@@ -421,8 +431,25 @@ def _build_spoke_workflow(category: str, cfg: dict) -> dict:
         "'\\n\\nOriginal Post:\\n',"
         "body('Get_Lead_From_Table')?['content'],"
         "'\\n\\nContact: ',"
-        "body('Get_Lead_From_Table')?['contact']"
+        "body('Get_Lead_From_Table')?['contact'],"
+        "'\\n\\nMedia Instructions:\\n',"
+        "outputs('Build_Media_Instruction')"
         ")}"
+    )
+
+    # Deterministic tool — resolves hasImages/hasVideos booleans into exact
+    # prompt instructions so the model never interprets the raw flags itself.
+    _img = "equals(toLower(coalesce(body('Get_Lead_From_Table')?['hasImages'],'false')),'true')"
+    _vid = "equals(toLower(coalesce(body('Get_Lead_From_Table')?['hasVideos'],'false')),'true')"
+    media_instruction_expr = (
+        f"@if(and({_img},{_vid}),"
+        f"'{build_media_instruction(True, True)}',"
+        f"if({_img},"
+        f"'{build_media_instruction(True, False)}',"
+        f"if({_vid},"
+        f"'{build_media_instruction(False, True)}',"
+        f"'{build_media_instruction(False, False)}'"
+        ")))"
     )
 
     gemini_payload = {
@@ -474,6 +501,13 @@ def _build_spoke_workflow(category: str, cfg: dict) -> dict:
                 },
                 "runAfter": {}
             },
+            # Deterministic tool — maps hasImages/hasVideos from the table row
+            # into exact prompt text before the model sees anything.
+            "Build_Media_Instruction": {
+                "type": "Compose",
+                "inputs": media_instruction_expr,
+                "runAfter": {"Get_Lead_From_Table": ["Succeeded"]}
+            },
             # Logic Apps returns 202 immediately to caller (hub) when HTTP trigger fires;
             # remaining actions run asynchronously in the background.
             "Call_Gemini_Outreach": {
@@ -488,7 +522,7 @@ def _build_spoke_workflow(category: str, cfg: dict) -> dict:
                     "body": gemini_payload,
                     "retryPolicy": _GEMINI_RETRY_POLICY
                 },
-                "runAfter": {"Get_Lead_From_Table": ["Succeeded"], "Fetch_Api_Key": ["Succeeded"]}
+                "runAfter": {"Build_Media_Instruction": ["Succeeded"], "Fetch_Api_Key": ["Succeeded"]}
             },
             "Parse_Outreach_Args": {
                 "type": "Compose",

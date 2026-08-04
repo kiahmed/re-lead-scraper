@@ -51,6 +51,12 @@
                   },
                   "groupName": {
                     "type": "string"
+                  },
+                  "hasImages": {
+                    "type": "boolean"
+                  },
+                  "hasVideos": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -78,7 +84,7 @@
       "type": "Query",
       "inputs": {
         "from": "@triggerBody()?['items']",
-        "where": "@and(or(contains(toLower(string(item()?['keywords'])),'atlanta'),contains(toLower(string(item()?['keywords'])),'jacksonville'),contains(toLower(string(item()?['keywords'])),'savannah')),or(not(contains(toLower(item()?['content']),'hoa')),contains(toLower(replace(item()?['content'],' ','')),concat('hoa:$0')),contains(toLower(replace(item()?['content'],' ','')),concat('hoa=$0')),contains(toLower(replace(item()?['content'],' ','')),concat('hoa:0')),contains(toLower(replace(item()?['content'],' ','')),concat('hoa=0')),contains(toLower(item()?['content']),'no hoa'),contains(toLower(item()?['content']),'hoa none')))"
+        "where": "@true"
       },
       "runAfter": {}
     },
@@ -121,6 +127,8 @@
                   "groupName": "@{coalesce(items('For_Each_Filtered_Lead')?['groupName'], '')}",
                   "keywords": "@{string(items('For_Each_Filtered_Lead')?['keywords'])}",
                   "url": "@{coalesce(items('For_Each_Filtered_Lead')?['url'], '')}",
+                  "hasImages": "@{coalesce(items('For_Each_Filtered_Lead')?['hasImages'], false)}",
+                  "hasVideos": "@{coalesce(items('For_Each_Filtered_Lead')?['hasVideos'], false)}",
                   "stored_at": "@{utcNow()}"
                 }
               },

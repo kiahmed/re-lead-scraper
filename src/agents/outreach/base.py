@@ -83,6 +83,22 @@ def _request_with_retry(
     raise RuntimeError(f"[{label}] Request failed after all retries")
 
 
+def build_media_instruction(has_images: bool, has_videos: bool) -> str:
+    """Deterministic tool — crafts photo/video ask based on what the poster attached.
+    Called locally and mirrored as a Compose action in spoke Logic Apps."""
+    if has_images and has_videos:
+        return ("The poster included photos and videos with their post. "
+                "Ask if these were recently taken.")
+    if has_images:
+        return ("The poster included photos but no videos. "
+                "Ask if the photos were recently taken, and request a drive link for recent videos.")
+    if has_videos:
+        return ("The poster included videos but no photos. "
+                "Ask if the videos were recently taken, and request a drive link for recent photos.")
+    return ("The poster did not include photos or videos. "
+            "Ask them to provide a drive link for recent photos or videos of the property.")
+
+
 class BaseOutreachAgent:
     CATEGORY: str = ""  # set by subclass
 
@@ -105,6 +121,9 @@ class BaseOutreachAgent:
         contact = classified.get("contact", {})
         author  = contact.get("author") or lead.get("authorName", "Unknown")
         content = lead.get("content", "")
+        has_images = bool(lead.get("hasImages", False))
+        has_videos = bool(lead.get("hasVideos", False))
+        media_inst = build_media_instruction(has_images, has_videos)
         lines = [
             f"Category: {self.CATEGORY}",
             f"Author: {author}",
@@ -114,6 +133,9 @@ class BaseOutreachAgent:
             "",
             f"Contact: dm_requested={contact.get('dm_requested')}, "
             f"email={contact.get('email')}, phone={contact.get('phone')}",
+            "",
+            "Media Instructions:",
+            media_inst,
         ]
         return "\n".join(lines)
 

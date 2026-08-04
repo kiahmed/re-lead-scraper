@@ -6,6 +6,10 @@
 
 # ── Hub execution config ──────────────────────────────────────────────────────
 hub:
+  # Master switch for the city + HOA filter stage.
+  # When false, ALL inbound leads bypass filtering and go straight to classification.
+  filter_enabled: false
+
   # How many leads to classify in parallel within the foreach loop.
   # At 2000 RPM / 4M TPM (Gemini 2.5 Flash), batch_size=3 keeps peak load
   # well under 20 RPM even with simultaneous spoke calls.

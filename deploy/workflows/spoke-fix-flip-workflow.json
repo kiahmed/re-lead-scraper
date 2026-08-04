@@ -60,6 +60,15 @@
       },
       "runAfter": {}
     },
+    "Build_Media_Instruction": {
+      "type": "Compose",
+      "inputs": "@if(and(equals(toLower(coalesce(body('Get_Lead_From_Table')?['hasImages'],'false')),'true'),equals(toLower(coalesce(body('Get_Lead_From_Table')?['hasVideos'],'false')),'true')),'The poster included photos and videos with their post. Ask if these were recently taken.',if(equals(toLower(coalesce(body('Get_Lead_From_Table')?['hasImages'],'false')),'true'),'The poster included photos but no videos. Ask if the photos were recently taken, and request a drive link for recent videos.',if(equals(toLower(coalesce(body('Get_Lead_From_Table')?['hasVideos'],'false')),'true'),'The poster included videos but no photos. Ask if the videos were recently taken, and request a drive link for recent photos.','The poster did not include photos or videos. Ask them to provide a drive link for recent photos or videos of the property.')))",
+      "runAfter": {
+        "Get_Lead_From_Table": [
+          "Succeeded"
+        ]
+      }
+    },
     "Call_Gemini_Outreach": {
       "type": "Http",
       "inputs": {
@@ -82,7 +91,7 @@
               "role": "user",
               "parts": [
                 {
-                  "text": "@{concat('Category: Fix & Flip\\nAuthor: ',body('Get_Lead_From_Table')?['authorName'],'\\n\\nOriginal Post:\\n',body('Get_Lead_From_Table')?['content'],'\\n\\nContact: ',body('Get_Lead_From_Table')?['contact'])}"
+                  "text": "@{concat('Category: Fix & Flip\\nAuthor: ',body('Get_Lead_From_Table')?['authorName'],'\\n\\nOriginal Post:\\n',body('Get_Lead_From_Table')?['content'],'\\n\\nContact: ',body('Get_Lead_From_Table')?['contact'],'\\n\\nMedia Instructions:\\n',outputs('Build_Media_Instruction'))}"
                 }
               ]
             }
@@ -152,7 +161,7 @@
         }
       },
       "runAfter": {
-        "Get_Lead_From_Table": [
+        "Build_Media_Instruction": [
           "Succeeded"
         ],
         "Fetch_Api_Key": [
