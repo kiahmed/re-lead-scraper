@@ -131,7 +131,7 @@ publish: deploy-be deploy-azure ## Full production deploy: backend then frontend
 # ---- Git workflow ----
 
 # typo guard: any command-line VAR= outside this list fails loudly
-KNOWN_VARS := U m
+KNOWN_VARS := U m FORCE
 # MAKEOVERRIDES splits quoted values on spaces — only words containing '=' are variable assignments
 BAD_VARS := $(filter-out $(KNOWN_VARS),$(foreach o,$(MAKEOVERRIDES),$(if $(findstring =,$(o)),$(firstword $(subst =, ,$(o))))))
 ifneq ($(BAD_VARS),)
@@ -169,7 +169,7 @@ ship: _notmain ## make ship m="msg" — lint+typecheck+tests, guarded commit, pu
 	$(MAKE) --no-print-directory push
 	$(MAKE) --no-print-directory pr
 
-clean-worktrees: ## Sync main checkout (ff pull), then remove .claude/worktrees checkouts (skips current; refuses dirty)
+clean-worktrees: ## Sync main checkout (ff pull), remove .claude/worktrees checkouts + orphan dirs, delete merged branches (FORCE=1 removes dirty)
 	@common=$$(git rev-parse --path-format=absolute --git-common-dir); \
 	root=$$(dirname "$$common"); cur=$$(git rev-parse --show-toplevel); \
 	git fetch -q origin; \
@@ -178,8 +178,28 @@ clean-worktrees: ## Sync main checkout (ff pull), then remove .claude/worktrees 
 	else echo "main checkout has local changes — pull skipped"; fi; \
 	for wt in "$$root"/.claude/worktrees/*/; do \
 		[ -d "$$wt" ] || continue; \
-		wtpath=$$(cd "$$wt" && git rev-parse --show-toplevel 2>/dev/null) || continue; \
-		if [ "$$wtpath" = "$$cur" ]; then echo "skip (current): $$wt"; continue; fi; \
-		if [ -n "$$(git -C "$$wt" status --porcelain 2>/dev/null)" ]; then echo "refuse (dirty): $$wt"; continue; fi; \
-		git worktree remove "$$wt" && echo "removed: $$wt"; \
-	done; git worktree prune
+		wt=$${wt%/}; \
+		if [ "$$wt" = "$$cur" ]; then echo "skip (current): $$wt"; continue; fi; \
+		if [ ! -e "$$wt/.git" ]; then \
+			echo "orphan (no .git — leftover from failed remove): deleting $$wt"; \
+			rm -rf "$$wt"; continue; fi; \
+		if ! git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+			echo "broken (unreadable .git): deleting $$wt"; rm -rf "$$wt"; continue; fi; \
+		br=$$(git -C "$$wt" rev-parse --abbrev-ref HEAD 2>/dev/null); \
+		st=$$(git -C "$$wt" status --porcelain 2>/dev/null); \
+		if [ -n "$$st" ] && [ "$(FORCE)" != "1" ]; then \
+			echo "refuse (dirty — rerun with FORCE=1): $$wt"; continue; fi; \
+		git worktree unlock "$$wt" >/dev/null 2>&1 || true; \
+		if git worktree remove $(if $(filter 1,$(FORCE)),--force) "$$wt" 2>/dev/null \
+			|| git worktree remove --force "$$wt" 2>/dev/null; then \
+			echo "removed: $$wt"; \
+		else echo "git remove failed: $$wt"; fi; \
+		if [ -d "$$wt" ]; then echo "dir left behind (WSL file lock?): deleting $$wt"; rm -rf "$$wt" || echo "rm failed — close programs using it and rerun"; fi; \
+		if [ -n "$$br" ] && [ "$$br" != "HEAD" ] && [ "$$br" != "main" ] && [ "$$br" != "master" ]; then \
+			if git merge-base --is-ancestor "$$br" origin/main 2>/dev/null; then \
+				git branch -D "$$br" >/dev/null 2>&1 && echo "deleted merged local branch: $$br"; \
+				if git show-ref -q "refs/remotes/origin/$$br"; then \
+					git push -q origin --delete "$$br" 2>/dev/null && echo "deleted merged remote branch: origin/$$br" \
+					|| echo "could not delete remote branch (permissions?): origin/$$br"; fi; \
+			else echo "kept branch (has commits not on origin/main): $$br"; fi; fi; \
+	done; git worktree prune; echo "clean-worktrees: done"
