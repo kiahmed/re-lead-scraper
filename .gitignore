@@ -11,3 +11,5 @@ admin-api/local.settings.json
 artifacts/
 admin-api/values.yaml
 .python_packages/
+
+.claude/
