@@ -123,7 +123,7 @@ docker-run: ## Not used — run locally with 'make deploy-local' instead
 publish: deploy-be deploy-azure ## Full production deploy: backend then frontend
 
 .PHONY: help install dev dev-ui watch stop clean test test-py test-ui lint format typecheck \
-	_notmain guard commit push pr ship clean-worktrees \
+	_notmain guard commit push pr ship pull merge clean-branches clean-worktrees \
 	build preview deploy-local deploy-azure run migrate seed deploy-be \
 	create-user disable-user reset-password list-users purge-sessions \
 	package docker-build docker-run publish
@@ -131,7 +131,7 @@ publish: deploy-be deploy-azure ## Full production deploy: backend then frontend
 # ---- Git workflow ----
 
 # typo guard: any command-line VAR= outside this list fails loudly
-KNOWN_VARS := U m FORCE
+KNOWN_VARS := U m FORCE b
 # MAKEOVERRIDES splits quoted values on spaces — only words containing '=' are variable assignments
 BAD_VARS := $(filter-out $(KNOWN_VARS),$(foreach o,$(MAKEOVERRIDES),$(if $(findstring =,$(o)),$(firstword $(subst =, ,$(o))))))
 ifneq ($(BAD_VARS),)
@@ -143,6 +143,33 @@ _notmain:
 	if [ "$$branch" = "main" ] || [ "$$branch" = "master" ]; then \
 		echo "refusing: on $$branch — create a branch first"; exit 1; fi
 
+pull: ## Fast-forward current branch from origin, prune stale remote refs
+	git pull --ff-only --prune
+
+merge: ## make merge b=<PR# or branch> — merge into main (PR merge deletes its branch)
+	@test -n "$(b)" || { echo 'usage: make merge b=<PR# or branch>'; exit 1; }
+	@git fetch -q origin
+	@case "$(b)" in \
+	  *[!0-9]*) git merge --no-ff "origin/$(b)" 2>/dev/null || git merge --no-ff "$(b)";; \
+	  *) gh pr merge "$(b)" --merge --delete-branch;; \
+	esac
+
+clean-branches: ## Delete local+remote branches fully merged into origin/main (keeps main, unmerged, and worktree-checked-out branches)
+	@git fetch -q --prune origin; \
+	for br in $$(git for-each-ref --format='%(refname:short)' refs/heads/); do \
+		if [ "$$br" = "main" ] || [ "$$br" = "master" ]; then continue; fi; \
+		if git worktree list --porcelain | grep -qx "branch refs/heads/$$br" \
+			&& [ "$$br" != "$$(git rev-parse --abbrev-ref HEAD)" ]; then \
+			echo "kept (checked out in a worktree): $$br"; continue; fi; \
+		if ! git merge-base --is-ancestor "$$br" origin/main 2>/dev/null; then \
+			echo "kept (not merged to origin/main): $$br"; continue; fi; \
+		if [ "$$br" = "$$(git rev-parse --abbrev-ref HEAD)" ]; then continue; fi; \
+		git branch -D "$$br" >/dev/null && echo "deleted local: $$br"; \
+		if git show-ref -q "refs/remotes/origin/$$br"; then \
+			git push -q origin --delete "$$br" 2>/dev/null && echo "deleted remote: origin/$$br" \
+			|| echo "could not delete remote: origin/$$br"; fi; \
+	done
+
 guard: ## Scan staged changes for secrets/sensitive files (runs inside commit/ship)
 	@git diff --cached --name-only | grep -E '(^|/)\.env$$|\.pem$$|\.p12$$|local\.settings\.json$$' \
 		&& { echo "guard: sensitive file staged — commit blocked"; exit 1; } || true
@@ -150,24 +177,27 @@ guard: ## Scan staged changes for secrets/sensitive files (runs inside commit/sh
 		|| { echo "guard: possible secret in staged diff — commit blocked"; exit 1; }
 	@echo "guard: clean"
 
-commit: _notmain ## make commit m="message" — guarded commit of all changes
+commit: ## make commit m="message" — guarded commit of all changes (works on main)
 	@test -n "$(m)" || { echo 'usage: make commit m="message"'; exit 1; }
 	@git add -A
 	@$(MAKE) --no-print-directory guard
 	@if git diff --cached --quiet; then echo "nothing to commit"; else git commit -m "$(m)"; fi
 
-push: _notmain ## Push current branch to origin
+push: ## Push current branch to origin (works on main)
 	git push -u origin HEAD
 
 pr: _notmain ## Open a draft PR for the current branch (no-op if one exists)
 	-gh pr create --draft --fill 2>/dev/null || echo "PR already exists (or gh unavailable)"
 
-ship: _notmain ## make ship m="msg" — lint+typecheck+tests, guarded commit, push, draft PR
+ship: ## make ship m="msg" — lint+typecheck+tests, guarded commit, push; draft PR only off-main
 	@test -n "$(m)" || { echo 'usage: make ship m="message"'; exit 1; }
 	$(MAKE) --no-print-directory lint typecheck test
 	$(MAKE) --no-print-directory commit m="$(m)"
 	$(MAKE) --no-print-directory push
-	$(MAKE) --no-print-directory pr
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$branch" != "main" ] && [ "$$branch" != "master" ]; then \
+		$(MAKE) --no-print-directory pr; \
+	else echo "on $$branch — shipped directly, no PR"; fi
 
 clean-worktrees: ## Sync main checkout (ff pull), remove .claude/worktrees checkouts + orphan dirs, delete merged branches (FORCE=1 removes dirty)
 	@common=$$(git rev-parse --path-format=absolute --git-common-dir); \
