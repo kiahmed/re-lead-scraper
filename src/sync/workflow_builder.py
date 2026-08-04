@@ -249,6 +249,7 @@ def _build_hub_workflow(cfg: dict) -> dict:
                                         "authorName": "@items('For_Each_Filtered_Lead')?['authorName']",
                                         "groupName":  "@{coalesce(items('For_Each_Filtered_Lead')?['groupName'], '')}",
                                         "keywords":   "@{string(items('For_Each_Filtered_Lead')?['keywords'])}",
+                                        "url":        "@{coalesce(items('For_Each_Filtered_Lead')?['url'], '')}",
                                         "stored_at":  "@{utcNow()}"
                                     }
                                 },

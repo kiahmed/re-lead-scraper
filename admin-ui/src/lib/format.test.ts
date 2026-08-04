@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { categoryClass, fmtValue, humanizeKey } from './format'
+import { categoryClass, fmtValue, humanizeKey, postUrl } from './format'
 
 describe('humanizeKey', () => {
   it('converts snake_case and camelCase', () => {
@@ -29,5 +29,21 @@ describe('categoryClass', () => {
     expect(categoryClass('Fix & Flip')).toBe('fix-flip')
     expect(categoryClass('JV or Wholesale')).toBe('jv-wholesale')
     expect(categoryClass('Weird New Category')).toBe('others')
+  })
+})
+
+describe('postUrl', () => {
+  it('prefers the stored url', () => {
+    expect(postUrl({ id: 'facebook_x', url: 'https://fb.com/p/1' })).toBe('https://fb.com/p/1')
+  })
+  it('derives a story.php permalink from the encoded id', () => {
+    const id = 'facebook_' + btoa('S:_I100000074247130:VK:1645182933436241')
+    expect(postUrl({ id })).toBe(
+      'https://www.facebook.com/story.php?story_fbid=1645182933436241&id=100000074247130',
+    )
+  })
+  it('returns empty for underivable ids', () => {
+    expect(postUrl({ id: 'facebook_!!!notbase64' })).toBe('')
+    expect(postUrl({ id: 'zillow_123' })).toBe('')
   })
 })

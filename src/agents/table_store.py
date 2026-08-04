@@ -101,6 +101,7 @@ def upsert_filtered_lead(lead: dict) -> None:
         "keywords": json.dumps(lead.get("keywords", [])),
         "authorName": lead.get("authorName", ""),
         "groupName": lead.get("groupName", ""),
+        "url": lead.get("url", ""),
         "stored_at": _now(),
     })
 
