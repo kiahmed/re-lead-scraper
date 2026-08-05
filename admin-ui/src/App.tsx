@@ -6,6 +6,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { useAuth } from './auth/AuthContext'
 import { LeadDetailPage } from './pages/LeadDetailPage'
 import { LeadListPage } from './pages/LeadListPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 function AppHeader() {
   const { user, logout } = useAuth()
@@ -22,6 +23,7 @@ function AppHeader() {
           {status === 'in-sync' ? '● In sync' : `○ ${status}`}
         </span>
       )}
+      <button className="btn" onClick={() => navigate('/settings')}>Settings</button>
       <span className="muted">{user?.display_name || user?.username}</span>
       <button
         className="btn"
@@ -51,6 +53,7 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<RequireAuth><Shell><LeadListPage /></Shell></RequireAuth>} />
       <Route path="/leads/:leadId" element={<RequireAuth><Shell><LeadDetailPage /></Shell></RequireAuth>} />
+      <Route path="/settings" element={<RequireAuth><Shell><SettingsPage /></Shell></RequireAuth>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

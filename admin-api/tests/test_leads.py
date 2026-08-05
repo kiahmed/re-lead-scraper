@@ -179,3 +179,62 @@ def test_url_surfaced_in_detail():
         "url": "https://www.facebook.com/groups/g/posts/123/",
     })
     assert leads.get_lead(lead_id)["url"] == "https://www.facebook.com/groups/g/posts/123/"
+
+
+def seed_dated(rk: str, stored_at: str, keep=False, category="Regular"):
+    tables.upsert(tables.TABLE_LEADS, {
+        "PartitionKey": "filtered", "RowKey": rk, "lead_id": rk,
+        "content": "x", "keywords": json.dumps([]), "category": category,
+        "stored_at": stored_at, "keep": keep,
+    })
+
+
+def test_purge_requires_to_date_and_defaults_to_dry_run():
+    seed_dated("a", "2026-01-05T00:00:00+00:00")
+    with pytest.raises(ApiError):
+        leads.purge_leads({})
+    result = leads.purge_leads({"to": "2026-02-01"})
+    assert result["dry_run"] is True and result["would_purge"] == 1
+    assert leads.list_leads({})["total"] == 1  # nothing deleted
+
+
+def test_purge_deletes_in_window_only():
+    seed_dated("old", "2026-01-05T00:00:00+00:00")
+    seed_dated("new", "2026-07-05T00:00:00+00:00")
+    result = leads.purge_leads({"to": "2026-06-30", "dry_run": False})
+    assert result["purged"] == 1
+    remaining = leads.list_leads({})
+    assert remaining["total"] == 1 and remaining["items"][0]["id"] == "new"
+
+
+def test_purge_skips_kept_and_worked_leads():
+    from core import interactions
+    seed_dated("kept", "2026-01-05T00:00:00+00:00", keep=True)
+    seed_dated("worked", "2026-01-06T00:00:00+00:00")
+    seed_dated("stale", "2026-01-07T00:00:00+00:00")
+    interactions.create("worked", "alice", {"type": "note", "body": "big multi-unit, still live"})
+    result = leads.purge_leads({"to": "2026-02-01", "dry_run": False})
+    assert result["purged"] == 1
+    assert result["skipped_keep"] == 1 and result["skipped_activity"] == 1
+    ids = {ld["id"] for ld in leads.list_leads({})["items"]}
+    assert ids == {"kept", "worked"}
+
+
+def test_purge_include_worked_and_from_bound():
+    from core import interactions
+    seed_dated("worked", "2026-01-06T00:00:00+00:00")
+    seed_dated("early", "2025-12-01T00:00:00+00:00")
+    interactions.create("worked", "alice", {"type": "note", "body": "n"})
+    result = leads.purge_leads({
+        "from": "2026-01-01", "to": "2026-02-01",
+        "include_worked": True, "dry_run": False,
+    })
+    assert result["purged"] == 1  # 'early' outside from-bound, 'worked' included
+    assert interactions.list_for_lead("worked") == []  # interactions purged too
+    assert {ld["id"] for ld in leads.list_leads({})["items"]} == {"early"}
+
+
+def test_keep_flag_editable():
+    lead_id = seed_lead(1)
+    assert leads.update_lead(lead_id, {"keep": True})["keep"] is True
+    assert leads.update_lead(lead_id, {"keep": False})["keep"] is False

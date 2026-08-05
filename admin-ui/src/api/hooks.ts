@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './client'
-import type { Interaction, LeadDetail, LeadListResponse, Meta } from './types'
+import type { Interaction, LeadDetail, LeadListResponse, Meta, PurgeResult } from './types'
 
 export interface LeadFilters {
   q: string
@@ -99,5 +99,23 @@ export function usePatchInteraction(leadId: string) {
         body: changes,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['interactions', leadId] }),
+  })
+}
+
+export interface PurgeParams {
+  from: string
+  to: string
+  include_worked: boolean
+  dry_run: boolean
+}
+
+export function usePurge() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (params: PurgeParams) =>
+      api<PurgeResult>('leads/purge', { method: 'POST', body: params }),
+    onSuccess: (result) => {
+      if (!result.dry_run) qc.invalidateQueries({ queryKey: ['leads'] })
+    },
   })
 }

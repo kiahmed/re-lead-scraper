@@ -16,6 +16,7 @@ SNIPPET_CHARS = 280
 # columns the UI may edit — everything else belongs to the pipeline
 _EDITABLE_TEXT = {"category", "authorName", "groupName", "outreach_message", "investment_summary"}
 _EDITABLE_JSON = {"contact", "extracted_info"}
+_EDITABLE_BOOL = {"keep"}  # pinned leads are immune to purge
 
 
 def _parse_json(value, fallback):
@@ -38,6 +39,7 @@ def _to_lead(row: dict, full: bool = False) -> dict:
         "has_selling_intent": row.get("has_selling_intent"),
         "is_complete": row.get("is_complete"),
         "outreach_skipped": row.get("outreach_skipped"),
+        "keep": bool(row.get("keep", False)),
         "errorMessage": row.get("errorMessage", ""),
         "missing_fields": _parse_json(row.get("missing_fields"), []),
         "stored_at": row.get("stored_at", ""),
@@ -172,8 +174,11 @@ def update_lead(lead_id: str, changes: dict) -> dict:
             update[key] = "" if value is None else str(value)
         elif key in _EDITABLE_JSON:
             update[key] = json.dumps(value) if isinstance(value, (dict, list)) else str(value or "")
+        elif key in _EDITABLE_BOOL:
+            update[key] = bool(value)
     if not update:
-        raise ApiError(400, f"nothing to update — editable: {sorted(_EDITABLE_TEXT | _EDITABLE_JSON)}")
+        editable = sorted(_EDITABLE_TEXT | _EDITABLE_JSON | _EDITABLE_BOOL)
+        raise ApiError(400, f"nothing to update — editable: {editable}")
     update.update({"PartitionKey": "filtered", "RowKey": rk})
     tables.upsert(tables.TABLE_LEADS, update)
     return get_lead(lead_id)
@@ -187,3 +192,56 @@ def delete_lead(lead_id: str) -> None:
     for row in tables.query(tables.TABLE_INTERACTIONS, f"PartitionKey eq '{ipk}'"):
         tables.delete(tables.TABLE_INTERACTIONS, ipk, row["RowKey"])
     tables.delete(tables.TABLE_LEADS, "filtered", rk)
+
+
+def purge_leads(params: dict) -> dict:
+    """Bulk-delete leads received in a date window, with two protections:
+    leads pinned with keep=true are never purged, and leads that have notes
+    or follow-ups are skipped unless include_worked is set. dry_run (the
+    default) only counts."""
+    to_raw = str(params.get("to", ""))
+    dt_from = _parse_dt(str(params.get("from", "")))
+    dt_to = _parse_dt(to_raw)
+    if dt_to is None:
+        raise ApiError(400, "a 'to' date is required — refusing an unbounded purge")
+    if "T" not in to_raw:
+        dt_to = dt_to + timedelta(days=1)  # bare date → inclusive end of day
+    include_worked = bool(params.get("include_worked", False))
+    dry_run = bool(params.get("dry_run", True))
+
+    rows = tables.query(tables.TABLE_LEADS, "PartitionKey eq 'filtered'")
+    to_purge: list[dict] = []
+    skipped_keep = skipped_activity = 0
+    by_category: dict[str, int] = {}
+    for row in rows:
+        lead = _to_lead(row)
+        if not _in_date_range(lead, dt_from, dt_to):
+            continue
+        if bool(row.get("keep", False)):
+            skipped_keep += 1
+            continue
+        lead_id = row.get("lead_id", "") or row.get("RowKey", "")
+        ipk = tables.encode_row_key(lead_id)
+        interactions = tables.query(tables.TABLE_INTERACTIONS, f"PartitionKey eq '{ipk}'")
+        if interactions and not include_worked:
+            skipped_activity += 1
+            continue
+        to_purge.append({"row": row, "ipk": ipk, "interactions": interactions})
+        cat = lead["category"] or "Unclassified"
+        by_category[cat] = by_category.get(cat, 0) + 1
+
+    if not dry_run:
+        for entry in to_purge:
+            for i_row in entry["interactions"]:
+                tables.delete(tables.TABLE_INTERACTIONS, entry["ipk"], i_row["RowKey"])
+            tables.delete(tables.TABLE_LEADS, "filtered", entry["row"]["RowKey"])
+
+    return {
+        "dry_run": dry_run,
+        "matched": len(to_purge) + skipped_keep + skipped_activity,
+        "purged": 0 if dry_run else len(to_purge),
+        "would_purge": len(to_purge),
+        "skipped_keep": skipped_keep,
+        "skipped_activity": skipped_activity,
+        "by_category": by_category,
+    }

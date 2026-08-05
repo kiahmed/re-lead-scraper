@@ -17,6 +17,7 @@ const listResponse: LeadListResponse = {
       has_selling_intent: true,
       is_complete: false,
       outreach_skipped: false,
+      keep: false,
       errorMessage: 'none',
       missing_fields: ['asking_price'],
       stored_at: '2026-08-01T09:12:00+00:00',

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
-import { useDeleteLead, useLead } from '../api/hooks'
+import { useDeleteLead, useLead, usePatchLead } from '../api/hooks'
 import { CategoryChip } from '../components/CategoryChip'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PencilIcon, TrashIcon } from '../components/Icons'
@@ -17,6 +17,7 @@ export function LeadDetailPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const { data: lead, isLoading, isError, error } = useLead(leadId)
   const deleteLead = useDeleteLead()
+  const patchLead = usePatchLead(leadId)
   const navigate = useNavigate()
 
   if (isLoading) return <div className="screen-center muted">Loading lead…</div>
@@ -44,6 +45,14 @@ export function LeadDetailPage() {
         <CategoryChip category={lead.category} />
         <StatusGlyph {...lead} withLabel />
         <span className="row-actions detail-actions">
+          <button
+            className={lead.keep ? 'btn keep-btn keep-on' : 'btn keep-btn'}
+            title={lead.keep ? 'Pinned — protected from purge' : 'Pin to protect from purge'}
+            onClick={() => patchLead.mutate({ keep: !lead.keep })}
+            disabled={patchLead.isPending}
+          >
+            {lead.keep ? '★ Kept' : '☆ Keep'}
+          </button>
           {!editing && (
             <button className="icon-btn" aria-label="Edit lead" title="Edit" onClick={() => setEditing(true)}>
               <PencilIcon />

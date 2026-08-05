@@ -7,6 +7,7 @@ export interface LeadSummary {
   has_selling_intent: boolean | null
   is_complete: boolean | null
   outreach_skipped: boolean | null
+  keep: boolean
   errorMessage: string
   missing_fields: string[]
   stored_at: string
@@ -59,4 +60,14 @@ export interface Meta {
   categories: string[]
   required_fields: Record<string, string[]>
   pipeline: { status: string; deployed_at: string; synced_at: string }
+}
+
+export interface PurgeResult {
+  dry_run: boolean
+  matched: number
+  purged: number
+  would_purge: number
+  skipped_keep: number
+  skipped_activity: number
+  by_category: Record<string, number>
 }

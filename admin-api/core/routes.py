@@ -48,6 +48,10 @@ def h_lead_get(req: ApiRequest):
     return 200, leads.get_lead(req.path_params["lead_id"])
 
 
+def h_leads_purge(req: ApiRequest):
+    return 200, leads.purge_leads(req.body)
+
+
 def h_lead_patch(req: ApiRequest):
     return 200, leads.update_lead(req.path_params["lead_id"], req.body)
 
@@ -95,6 +99,7 @@ ROUTES = [
     ("GET",    "auth/me",                               h_me,                  True),
     ("GET",    "meta",                                  h_meta,                True),
     ("GET",    "leads",                                 h_leads_list,          True),
+    ("POST",   "leads/purge",                           h_leads_purge,         True),
     ("GET",    "leads/{lead_id}",                       h_lead_get,            True),
     ("PATCH",  "leads/{lead_id}",                       h_lead_patch,          True),
     ("DELETE", "leads/{lead_id}",                       h_lead_delete,         True),
