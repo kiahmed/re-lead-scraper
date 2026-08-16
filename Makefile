@@ -109,6 +109,11 @@ purge-sessions: ## Delete expired session rows
 service-token: ## Mint the machine token for the monthly purge sweep (prints once)
 	cd $(API) && python3 cli.py service-token
 
+deploy-sweep: ## Deploy/update the monthly purge sweep (TTLs in deploy/admin-ui.bicep)
+	az deployment group create -g $(RG) -f deploy/admin-ui.bicep \
+		--parameters purgeServiceToken=$$(cd $(API) && python3 cli.py service-token) \
+		--query properties.provisioningState -o tsv
+
 # ---- Deployment ----
 
 package: build ## Zip SPA + API into artifacts/ for manual deploys
