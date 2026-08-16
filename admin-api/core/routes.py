@@ -49,6 +49,8 @@ def h_lead_get(req: ApiRequest):
 
 
 def h_leads_purge(req: ApiRequest):
+    if "ttl_days" in req.body:
+        return 200, leads.purge_by_ttl(req.body)
     return 200, leads.purge_leads(req.body)
 
 

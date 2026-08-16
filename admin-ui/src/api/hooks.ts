@@ -107,6 +107,7 @@ export interface PurgeParams {
   to: string
   include_worked: boolean
   dry_run: boolean
+  categories?: string[]
 }
 
 export function usePurge() {

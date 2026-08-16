@@ -311,3 +311,6 @@
 }
 .menu-panel a:hover { background: var(--accent-soft); color: var(--accent); text-decoration: none; }
 a.app-mark:hover { text-decoration: none; }
+
+.purge-cats { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
+.purge-cat { display: flex; align-items: center; gap: var(--sp-1); background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; }

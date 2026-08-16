@@ -238,3 +238,34 @@ def test_keep_flag_editable():
     lead_id = seed_lead(1)
     assert leads.update_lead(lead_id, {"keep": True})["keep"] is True
     assert leads.update_lead(lead_id, {"keep": False})["keep"] is False
+
+
+def test_purge_category_filter():
+    seed_dated("sf", "2026-01-05T00:00:00+00:00", category="Seller Finance")
+    seed_dated("reg", "2026-01-06T00:00:00+00:00", category="Regular")
+    seed_dated("unc", "2026-01-07T00:00:00+00:00", category="")
+    result = leads.purge_leads({
+        "to": "2026-02-01", "categories": ["Seller Finance", "Unclassified"], "dry_run": False,
+    })
+    assert result["purged"] == 2
+    assert {ld["id"] for ld in leads.list_leads({})["items"]} == {"reg"}
+    with pytest.raises(ApiError):
+        leads.purge_leads({"to": "2026-02-01", "categories": "Seller Finance"})
+
+
+def test_purge_by_ttl():
+    from datetime import UTC, datetime, timedelta
+    now = datetime.now(UTC)
+    seed_dated("old-other", (now - timedelta(days=100)).isoformat(), category="Others")
+    seed_dated("new-other", (now - timedelta(days=10)).isoformat(), category="Others")
+    seed_dated("old-sf", (now - timedelta(days=100)).isoformat(), category="Seller Finance")
+    result = leads.purge_by_ttl({
+        "ttl_days": {"Others": 60, "Seller Finance": 365}, "dry_run": False,
+    })
+    assert result["purged"] == 1  # only the 100-day-old Others lead
+    ids = {ld["id"] for ld in leads.list_leads({})["items"]}
+    assert ids == {"new-other", "old-sf"}
+    with pytest.raises(ApiError):
+        leads.purge_by_ttl({"ttl_days": {}})
+    with pytest.raises(ApiError):
+        leads.purge_by_ttl({"ttl_days": {"Others": "soon"}})

@@ -10,6 +10,11 @@ param apiLocation string = 'eastus2'
 // region, so the API ships as SWA *managed* functions by default. Flip this
 // to true (after a quota increase) to provision the standalone Function App.
 param deployFunctionApp bool = false
+// Service token for the monthly purge sweep (mint with: make service-token).
+// Empty = the sweep Logic App is not deployed.
+@secure()
+param purgeServiceToken string = ''
+
 param storageAccountName string = 'releadscraper'
 param staticWebAppName string = 'flynest-admin'
 param functionAppName string = 'flynest-admin-api'
@@ -92,6 +97,67 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (deployFunctionApp) {
         { name: 'SCM_DO_BUILD_DURING_DEPLOYMENT', value: 'true' }
         { name: 'ENABLE_ORYX_BUILD', value: 'true' }
       ]
+    }
+  }
+}
+
+// ── monthly purge sweep — pure cron; ALL purge logic lives in the admin API ──
+// TTLs (days) per category; adjust here and re-deploy to tune retention.
+var purgeTtlDays = {
+  Others: 90
+  Regular: 365
+  'Fix & Flip': 365
+  'JV or Wholesale': 365
+  'Buyers Looking': 365
+  'Subject-To': 365
+  'Seller Finance': 365
+  Hybrid: 365
+}
+
+resource purgeSweep 'Microsoft.Logic/workflows@2019-05-01' = if (!empty(purgeServiceToken)) {
+  name: 'flynest-admin-purge-sweep'
+  location: location
+  properties: {
+    state: 'Enabled'
+    parameters: {
+      apiToken: { value: purgeServiceToken }
+    }
+    definition: {
+      '$schema': 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'
+      contentVersion: '1.0.0.0'
+      parameters: {
+        apiToken: { type: 'securestring' }
+      }
+      triggers: {
+        Monthly: {
+          type: 'Recurrence'
+          recurrence: {
+            frequency: 'Month'
+            interval: 1
+            schedule: { hours: [3], minutes: [0], monthDays: [1] }
+            timeZone: 'UTC'
+          }
+        }
+      }
+      actions: {
+        Purge_Old_Leads: {
+          type: 'Http'
+          inputs: {
+            method: 'POST'
+            uri: 'https://${staticWebApp.properties.defaultHostname}/api/leads/purge'
+            headers: {
+              'Content-Type': 'application/json'
+              'X-Admin-Token': '@parameters(\'apiToken\')'
+            }
+            body: {
+              ttl_days: purgeTtlDays
+              dry_run: false
+              include_worked: false
+            }
+            retryPolicy: { type: 'exponential', count: 3, interval: 'PT1M' }
+          }
+        }
+      }
     }
   }
 }

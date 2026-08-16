@@ -43,6 +43,7 @@ def main() -> None:
             p.add_argument("--role", default="admin")
     sub.add_parser("list")
     sub.add_parser("purge-sessions")
+    sub.add_parser("service-token")
     args = parser.parse_args()
 
     try:
@@ -62,6 +63,28 @@ def main() -> None:
             for u in users.list_users():
                 state = "active" if u["is_active"] else "DISABLED"
                 print(f"{u['username']:24} {u['role']:8} {state:8} last login: {u['last_login_at'] or '—'}")
+        elif args.cmd == "service-token":
+            # machine credential for the scheduled purge Logic App: a login-less
+            # user + a 10-year session. Only the SHA-256 hash is stored.
+            from core import security
+            if tables.get_entity(tables.TABLE_USERS, auth.USER_PK, "scheduler") is None:
+                tables.upsert(tables.TABLE_USERS, {
+                    "PartitionKey": auth.USER_PK, "RowKey": "scheduler",
+                    "password_hash": "", "display_name": "Scheduled purge",
+                    "role": "admin", "is_active": True,
+                    "failed_attempts": 0, "locked_until": "",
+                    "created_at": datetime.now(UTC).isoformat(), "last_login_at": "",
+                })
+            token = security.new_token()
+            tables.upsert(tables.TABLE_SESSIONS, {
+                "PartitionKey": auth.SESSION_PK,
+                "RowKey": security.token_hash(token),
+                "username": "scheduler",
+                "created_at": datetime.now(UTC).isoformat(),
+                "last_seen_at": datetime.now(UTC).isoformat(),
+                "expires_at": datetime.now(UTC).replace(year=datetime.now(UTC).year + 10).isoformat(),
+            })
+            print(token)
         elif args.cmd == "purge-sessions":
             now = datetime.now(UTC).isoformat()
             rows = tables.query(tables.TABLE_SESSIONS, f"PartitionKey eq '{auth.SESSION_PK}'")

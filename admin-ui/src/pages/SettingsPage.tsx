@@ -16,6 +16,7 @@ export function SettingsPage() {
   const [to, setTo] = useState('')
   const [includeWorked, setIncludeWorked] = useState(false)
   const [preview, setPreview] = useState<PurgeResult | null>(null)
+  const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [confirming, setConfirming] = useState(false)
   const [done, setDone] = useState<PurgeResult | null>(null)
 
@@ -23,7 +24,13 @@ export function SettingsPage() {
     setDone(null)
     purge.mutate(
       { from: fromDate, to: toDate, include_worked: includeWorked, dry_run: true },
-      { onSuccess: setPreview },
+      {
+        onSuccess: (result) => {
+          setPreview(result)
+          // all categories selected by default
+          setChecked(Object.fromEntries(Object.keys(result.by_category).map((c) => [c, true])))
+        },
+      },
     )
   }
 
@@ -34,9 +41,14 @@ export function SettingsPage() {
     runPreview(cutoff, '')
   }
 
+  const selectedCategories = Object.keys(checked).filter((c) => checked[c])
+  const selectedCount = preview
+    ? selectedCategories.reduce((sum, c) => sum + (preview.by_category[c] ?? 0), 0)
+    : 0
+
   function executePurge() {
     purge.mutate(
-      { from, to, include_worked: includeWorked, dry_run: false },
+      { from, to, include_worked: includeWorked, dry_run: false, categories: selectedCategories },
       {
         onSuccess: (result) => {
           setDone(result)
@@ -99,16 +111,25 @@ export function SettingsPage() {
               (have activity)
             </p>
             {Object.keys(preview.by_category).length > 0 && (
-              <p className="muted">
-                {Object.entries(preview.by_category).map(([c, n]) => `${c}: ${n}`).join(' · ')}
-              </p>
+              <div className="purge-cats">
+                {Object.entries(preview.by_category).map(([c, n]) => (
+                  <label key={c} className="purge-cat">
+                    <input
+                      type="checkbox"
+                      checked={checked[c] ?? false}
+                      onChange={(e) => setChecked((prev) => ({ ...prev, [c]: e.target.checked }))}
+                    />
+                    {c} <span className="muted num">{n}</span>
+                  </label>
+                ))}
+              </div>
             )}
             <button
               className="btn btn-danger"
-              disabled={preview.would_purge === 0 || purge.isPending}
+              disabled={selectedCount === 0 || purge.isPending}
               onClick={() => setConfirming(true)}
             >
-              Purge {preview.would_purge} lead{preview.would_purge === 1 ? '' : 's'}…
+              Purge {selectedCount} lead{selectedCount === 1 ? '' : 's'}…
             </button>
           </div>
         )}
@@ -123,7 +144,7 @@ export function SettingsPage() {
 
       {confirming && preview && (
         <ConfirmDialog
-          title={`Purge ${preview.would_purge} leads?`}
+          title={`Purge ${selectedCount} leads in ${selectedCategories.length} categor${selectedCategories.length === 1 ? 'y' : 'ies'}?`}
           message="This permanently deletes these leads and their notes from storage. Pinned and active leads are preserved. This cannot be undone."
           confirmLabel="Purge"
           busy={purge.isPending}

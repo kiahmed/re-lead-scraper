@@ -106,6 +106,9 @@ list-users: ## List admin users
 purge-sessions: ## Delete expired session rows
 	cd $(API) && python3 cli.py purge-sessions
 
+service-token: ## Mint the machine token for the monthly purge sweep (prints once)
+	cd $(API) && python3 cli.py service-token
+
 # ---- Deployment ----
 
 package: build ## Zip SPA + API into artifacts/ for manual deploys

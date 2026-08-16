@@ -208,6 +208,9 @@ def purge_leads(params: dict) -> dict:
         dt_to = dt_to + timedelta(days=1)  # bare date → inclusive end of day
     include_worked = bool(params.get("include_worked", False))
     dry_run = bool(params.get("dry_run", True))
+    categories = params.get("categories")  # None/[] = all; names use "Unclassified" for blank
+    if categories is not None and not isinstance(categories, list):
+        raise ApiError(400, "categories must be a list")
 
     rows = tables.query(tables.TABLE_LEADS, "PartitionKey eq 'filtered'")
     to_purge: list[dict] = []
@@ -216,6 +219,8 @@ def purge_leads(params: dict) -> dict:
     for row in rows:
         lead = _to_lead(row)
         if not _in_date_range(lead, dt_from, dt_to):
+            continue
+        if categories and (lead["category"] or "Unclassified") not in categories:
             continue
         if bool(row.get("keep", False)):
             skipped_keep += 1
@@ -245,3 +250,29 @@ def purge_leads(params: dict) -> dict:
         "skipped_activity": skipped_activity,
         "by_category": by_category,
     }
+
+
+def purge_by_ttl(params: dict) -> dict:
+    """Scheduled-sweep mode: per-category TTLs in days. Reuses purge_leads
+    per category so every protection (keep pin, activity skip) applies."""
+    ttl_days = params.get("ttl_days")
+    if not isinstance(ttl_days, dict) or not ttl_days:
+        raise ApiError(400, "ttl_days must be a non-empty object of {category: days}")
+    dry_run = bool(params.get("dry_run", True))
+    include_worked = bool(params.get("include_worked", False))
+    now = datetime.now(UTC)
+    per_category: dict[str, dict] = {}
+    totals = {"purged": 0, "would_purge": 0, "skipped_keep": 0, "skipped_activity": 0}
+    for category, days in ttl_days.items():
+        try:
+            cutoff = (now - timedelta(days=int(days))).isoformat()
+        except (TypeError, ValueError):
+            raise ApiError(400, f"ttl_days for {category} must be an integer") from None
+        result = purge_leads({
+            "to": cutoff, "categories": [category],
+            "dry_run": dry_run, "include_worked": include_worked,
+        })
+        per_category[category] = {"cutoff": cutoff, **{k: result[k] for k in totals}}
+        for k in totals:
+            totals[k] += result[k]
+    return {"dry_run": dry_run, "mode": "ttl", **totals, "per_category": per_category}
