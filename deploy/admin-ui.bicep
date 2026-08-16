@@ -104,14 +104,14 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = if (deployFunctionApp) {
 // ── monthly purge sweep — pure cron; ALL purge logic lives in the admin API ──
 // TTLs (days) per category; adjust here and re-deploy to tune retention.
 var purgeTtlDays = {
-  Others: 90
-  Regular: 365
-  'Fix & Flip': 365
-  'JV or Wholesale': 365
-  'Buyers Looking': 365
-  'Subject-To': 365
-  'Seller Finance': 365
-  Hybrid: 365
+  Others: 15
+  Regular: 30
+  'Fix & Flip': 30
+  'JV or Wholesale': 30
+  'Buyers Looking': 30
+  'Subject-To': 30
+  'Seller Finance': 60
+  Hybrid: 60
 }
 
 resource purgeSweep 'Microsoft.Logic/workflows@2019-05-01' = if (!empty(purgeServiceToken)) {

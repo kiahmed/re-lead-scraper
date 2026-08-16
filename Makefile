@@ -109,6 +109,10 @@ purge-sessions: ## Delete expired session rows
 service-token: ## Mint the machine token for the monthly purge sweep (prints once)
 	cd $(API) && python3 cli.py service-token
 
+run-sweep: ## Fire the purge sweep NOW (real delete per TTLs — not a dry run)
+	az rest --method POST --url "https://management.azure.com/subscriptions/fbdc966a-9476-484f-8935-55dee4eef4f3/resourceGroups/$(RG)/providers/Microsoft.Logic/workflows/flynest-admin-purge-sweep/triggers/Monthly/run?api-version=2016-06-01"
+	@echo "sweep triggered — check results in the Settings page or Azure portal run history"
+
 deploy-sweep: ## Deploy/update the monthly purge sweep (TTLs in deploy/admin-ui.bicep)
 	az deployment group create -g $(RG) -f deploy/admin-ui.bicep \
 		--parameters purgeServiceToken=$$(cd $(API) && python3 cli.py service-token) \
