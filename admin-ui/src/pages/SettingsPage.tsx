@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { usePurge } from '../api/hooks'
 import type { PurgeResult } from '../api/types'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { fmtDate } from '../lib/format'
+import { fmtDate, fmtDateOnly } from '../lib/format'
 
 interface Preset {
   label: string
@@ -117,12 +117,24 @@ export function SettingsPage() {
           ))}
         </div>
 
+        {to && (
+          <p className="purge-window">
+            {active
+              ? <>Older than <strong>{active}</strong> — </>
+              : <>Custom window — </>}
+            {from
+              ? <>leads received between <strong>{fmtDateOnly(from)}</strong> and <strong>{fmtDateOnly(to)}</strong></>
+              : <>every lead received before <strong>{fmtDateOnly(to)}</strong></>}
+          </p>
+        )}
+
         <div className="purge-range">
-          <label>From
+          <label>From (optional)
             <input
               className="input"
               type="date"
               value={from}
+              title="Leave blank to include everything up to the To date"
               onChange={(e) => manual({ from: e.target.value })}
             />
           </label>

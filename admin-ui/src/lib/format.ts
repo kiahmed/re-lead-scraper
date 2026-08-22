@@ -34,6 +34,17 @@ export function fmtValue(value: unknown): string {
   return String(value)
 }
 
+/** Format a bare yyyy-mm-dd date-input value. Parsed as local parts, not
+ * via Date(string), which treats it as UTC and can shift the day. */
+export function fmtDateOnly(ymd: string): string {
+  if (!ymd) return '—'
+  const [y, m, d] = ymd.split('-').map(Number)
+  if (!y || !m || !d) return ymd
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  })
+}
+
 /** Facebook post URL: stored url when present, else derived from the lead id
  * (base64 "S:_I<authorId>:VK:<postId>" → story.php permalink). */
 export function postUrl(lead: { url?: string; id: string }): string {

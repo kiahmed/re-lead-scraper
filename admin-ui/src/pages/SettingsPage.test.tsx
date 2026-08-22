@@ -61,6 +61,20 @@ describe('SettingsPage quick presets', () => {
     expect(new Date(body.to).getTime()).toBeLessThan(Date.now() - 60 * 86_400_000)
   })
 
+  it('each preset applies its own cutoff and says so in words', async () => {
+    renderPage(emptyResult)
+    const toInput = () => screen.getByLabelText('To (required)') as HTMLInputElement
+    screen.getByRole('button', { name: '30 days' }).click()
+    await waitFor(() => expect(toInput().value).not.toBe(''))
+    const thirtyDay = toInput().value
+
+    screen.getByRole('button', { name: '3 months' }).click()
+    await waitFor(() => expect(toInput().value).not.toBe(thirtyDay))
+    // 3 months must reach further back than 30 days — the exact confusion reported
+    expect(new Date(toInput().value).getTime()).toBeLessThan(new Date(thirtyDay).getTime())
+    expect(screen.getByText(/every lead received before/)).toBeInTheDocument()
+  })
+
   it('explains an empty window instead of looking broken', async () => {
     renderPage(emptyResult)
     screen.getByRole('button', { name: '3 months' }).click()
@@ -72,7 +86,7 @@ describe('SettingsPage quick presets', () => {
     renderPage(hitResult)
     screen.getByRole('button', { name: '12 months' }).click()
     await waitFor(() => expect(screen.getByRole('button', { name: /Purge 12 leads/ })).toBeInTheDocument())
-    const fromInput = screen.getByLabelText('From') as HTMLInputElement
+    const fromInput = screen.getByLabelText('From (optional)') as HTMLInputElement
     expect(fromInput.value).toBe('2026-01-05')
     const toInput = screen.getByLabelText('To (required)') as HTMLInputElement
     expect(toInput.value).toMatch(/^\d{4}-\d{2}-\d{2}$/)
