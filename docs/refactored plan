@@ -79,3 +79,24 @@
   - Wrap classify_leads() exception so one bad batch marks leads as unclassified rather than crashing                               
                                                                                                                                     
  
+  ---
+  STATUS (2026-08-22) — all items closed
+
+  1. Savannah / dynamic cities .......... DONE (built from values.yaml; note hub.filter_enabled
+                                          is currently false, so every lead passes through)
+  2. Spoke catches Gemini outreach fail .. DONE (Call_Gemini_Outreach in Handle_Outreach_Error.runAfter)
+  3. Stale deployed workflow JSONs ....... DONE (sync.py --apply + deploy.py; Azure re-deployed)
+  4. Contact dict normalized ............. DONE (setdefault for every optional field)
+  5. Classifier batch all-or-nothing ..... DONE (ValueError caught; leads marked Others, batch survives)
+  6. Hub classification error handler .... DONE — classify chain now runs inside Classify_Lead_Scope
+                                          with Handle_Classify_Error on failure. Writes errorMessage
+                                          (with run id), classify_failed_at and full schema defaults.
+                                          classified_at is deliberately NOT set, so re-sending the
+                                          lead retries it. Verified live with an invalidated API key.
+  7. Duplicate webhooks .................. DONE — Get_Existing_Lead queries the table BEFORE Gemini.
+                                          A lead that already has classified_at hits Skip_Duplicate_Lead:
+                                          no Gemini call, no second spoke fire, original stored_at kept.
+                                          Verified live by replaying a real classified lead.
+  8. Others/error rows sparse columns .... DONE (full schema defaults written)
+  9. Sequential outreach dispatcher ...... DROPPED — local runner only; production is Azure spokes.
+ 10. Parse fallback vs real incomplete ... DROPPED — same reason.

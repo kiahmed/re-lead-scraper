@@ -128,6 +128,134 @@ def _load_values() -> dict:
         return yaml.safe_load(f)
 
 
+# ── Hub guards: duplicate suppression + classification error handling ────────
+# Applied to the flat hub definition after it is built, so the action literals
+# above stay readable.
+_CLASSIFY_CHAIN = (
+    "Call_Gemini_Classify",
+    "Parse_Classify_Args",
+    "Enforce_Selling_Intent_Gate",
+    "Upsert_Classification_To_Table",
+    "Condition_Route_To_Spoke",
+)
+
+_EXISTING = "body('Get_Existing_Lead')?['value']"
+_LEAD_ENTITY_PATH = (
+    "/Tables/@{encodeURIComponent(parameters('storageTableName'))}"
+    "/entities(PartitionKey='@{encodeURIComponent('filtered')}',"
+    "RowKey='@{encodeURIComponent(items('For_Each_Filtered_Lead')?['id'])}')"
+)
+_TABLE_HOST = {"connection": {"name": "@parameters('$connections')['azuretables']['connectionId']"}}
+
+# OData filter matching this lead's row; '' is an escaped single quote.
+_EXISTING_FILTER = (
+    "@{concat('PartitionKey eq ''filtered'' and RowKey eq ''', "
+    "items('For_Each_Filtered_Lead')?['id'], '''')}"
+)
+
+
+def _find_action(node, name: str):
+    """Locate an action by name anywhere in a (possibly nested) actions tree."""
+    if isinstance(node, dict):
+        candidate = node.get(name)
+        if isinstance(candidate, dict) and "type" in candidate:
+            return candidate
+        for value in node.values():
+            found = _find_action(value, name)
+            if found is not None:
+                return found
+    return None
+
+
+def _add_hub_guards(hub: dict) -> dict:
+    """Wrap the per-lead chain with two protections.
+
+    Duplicate webhooks: the lead is looked up BEFORE Gemini is called. A post
+    that already carries a classified_at is skipped entirely — no Gemini spend,
+    no second spoke fire — and its original stored_at is preserved. A lead that
+    exists but was never classified still runs, so a lead whose classification
+    failed can be retried simply by re-sending it.
+
+    Classification failure: the classify chain runs inside a Scope, so one
+    handler catches any failure in it and writes a full row of error defaults.
+    Without this the lead sat with no category and no error flag at all.
+    """
+    foreach = _find_action(hub["actions"], "For_Each_Filtered_Lead")
+    actions = foreach["actions"]
+
+    chain = {name: actions.pop(name) for name in _CLASSIFY_CHAIN}
+    chain["Call_Gemini_Classify"]["runAfter"] = {}
+
+    actions["Get_Existing_Lead"] = {
+        "type": "ApiConnection",
+        "inputs": {
+            "host": _TABLE_HOST,
+            "method": "get",
+            "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities",
+            "queries": {"$filter": _EXISTING_FILTER},
+        },
+        "runAfter": {},
+    }
+
+    lead_upsert = actions["Upsert_Lead_To_Table"]
+    lead_upsert["runAfter"] = {"Get_Existing_Lead": ["Succeeded"]}
+    # keep first-seen time: a re-delivery must not reset stored_at
+    lead_upsert["inputs"]["body"]["stored_at"] = (
+        "@{coalesce(first(" + _EXISTING + ")?['stored_at'], utcNow())}"
+    )
+
+    actions["Condition_Is_New_Lead"] = {
+        "type": "If",
+        "expression": {
+            "or": [
+                {"equals": ["@length(coalesce(" + _EXISTING + ", json('[]')))", 0]},
+                {"equals": ["@coalesce(first(" + _EXISTING + ")?['classified_at'], '')", ""]},
+            ]
+        },
+        "actions": {
+            "Classify_Lead_Scope": {"type": "Scope", "actions": chain, "runAfter": {}},
+            "Handle_Classify_Error": {
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": _TABLE_HOST,
+                    "method": "patch",
+                    "path": _LEAD_ENTITY_PATH,
+                    "body": {
+                        "category": "",
+                        "has_selling_intent": False,
+                        "errorMessage": (
+                            "@{concat('classification failed (run ', "
+                            "workflow()?['run']?['name'], ')')}"
+                        ),
+                        "classify_failed_at": "@{utcNow()}",
+                        "outreach_skipped": True,
+                        "is_complete": False,
+                        "missing_fields": "[]",
+                        "outreach_message": "",
+                        "investment_summary": "",
+                        "location_insights": "{}",
+                    },
+                },
+                "runAfter": {"Classify_Lead_Scope": ["Failed", "TimedOut"]},
+            },
+        },
+        "else": {
+            "actions": {
+                "Skip_Duplicate_Lead": {
+                    "type": "Compose",
+                    "inputs": (
+                        "@{concat('duplicate — already classified: ', "
+                        "items('For_Each_Filtered_Lead')?['id'])}"
+                    ),
+                    "runAfter": {},
+                }
+            }
+        },
+        "runAfter": {"Upsert_Lead_To_Table": ["Succeeded"]},
+    }
+    return hub
+
+
 # ── Hub workflow ──────────────────────────────────────────────────────────────
 def _build_hub_workflow(cfg: dict) -> dict:
     hub_cfg = cfg.get("hub", {})
@@ -184,7 +312,7 @@ def _build_hub_workflow(cfg: dict) -> dict:
         }
     }
 
-    return {
+    hub = {
         "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
         "contentVersion": "1.0.0.0",
         "parameters": {
@@ -414,6 +542,8 @@ def _build_hub_workflow(cfg: dict) -> dict:
         },
         "outputs": {}
     }
+
+    return _add_hub_guards(hub)
 
 
 # ── Spoke workflow ────────────────────────────────────────────────────────────

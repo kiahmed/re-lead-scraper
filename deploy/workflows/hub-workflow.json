@@ -129,146 +129,16 @@
                   "url": "@{coalesce(items('For_Each_Filtered_Lead')?['url'], '')}",
                   "hasImages": "@{coalesce(items('For_Each_Filtered_Lead')?['hasImages'], false)}",
                   "hasVideos": "@{coalesce(items('For_Each_Filtered_Lead')?['hasVideos'], false)}",
-                  "stored_at": "@{utcNow()}"
-                }
-              },
-              "runAfter": {}
-            },
-            "Call_Gemini_Classify": {
-              "type": "Http",
-              "inputs": {
-                "method": "POST",
-                "uri": "@{concat('https://generativelanguage.googleapis.com/v1beta/models/', parameters('geminiModel'), ':generateContent')}",
-                "headers": {
-                  "Content-Type": "application/json",
-                  "X-goog-api-key": "@body('Fetch_Api_Key')?['Value']"
-                },
-                "body": {
-                  "system_instruction": {
-                    "parts": [
-                      {
-                        "text": "You are a real estate investment analyst. For each post you receive, call classify_lead() exactly once.\n\nSTEP 1 \u2014 SELLING INTENT (decide this before any category):\n\nSet has_selling_intent = true ONLY if the poster is acting as a SELLER or DEAL-MAKER:\n  \u2022 An owner or seller actively offering a property for sale or creative transaction\n  \u2022 A wholesaler marketing or assigning a deal they have under contract (wholesaler IS the seller)\n  \u2022 An investor explicitly proposing a JV or partnership on a specific deal\n\nSet has_selling_intent = false if the poster is:\n  \u2022 A BUYER seeking a lender, broker, or funding for their own acquisition\n  \u2022 A BUYER seeking to find properties or deal flow to acquire (\u2192 check buying intent next)\n  \u2022 Someone asking \"how do I\" or seeking education on creative finance strategies\n  \u2022 Someone introducing themselves or networking without offering a specific deal\n  \u2022 A service provider advertising their own services (agents, attorneys, contractors, etc.)\n  \u2022 Anyone whose primary role in the post is SEEKER or LEARNER, not SELLER or DEAL-MAKER\n\nCRITICAL RULE: The presence of terms like \"morby method\", \"SubTo\", \"seller finance\",\n\"creative financing\" does NOT automatically imply selling intent. Always determine\nthe poster's ROLE (seller vs buyer/seeker) from the full context of the post first.\n\n\u2192 If has_selling_intent = true: proceed to Step 2 (seller categories).\n\u2192 If has_selling_intent = false: check if the poster is a BUYER actively seeking\n  properties or deal flow. If yes \u2192 category = \"Buyers Looking\". If no \u2192 category = \"Others\".\n\nSTEP 2 \u2014 CATEGORY DEFINITIONS (apply only when has_selling_intent = true):\n  \u2022 Subject-To: Seller is offering a property where the buyer takes over the existing mortgage\npayments while the loan remains in the seller's name. The seller retains the loan.\nSignals: \"subject to\", \"sub-to\", \"SubTo\", \"take over my payments\",\n\"existing loan stays in my name\", \"PITI payments\", \"deed transfer with loan in place\".\n  \u2022 Seller Finance: Seller is willing to act as the lender \u2014 carrying the note directly to the buyer\nwith no bank or institutional lender involved for that portion.\nSignals: \"seller financing\", \"owner financing\", \"seller carry\", \"owner will carry\",\n\"I'll finance\", \"seller may carry some\", \"owner carry\", \"carry the note\".\n  \u2022 Hybrid: Seller is offering a deal that explicitly combines BOTH an assumable existing loan\nAND seller carrying a second note for the gap. The poster MUST be the seller.\nIncludes the \"Morby Method\" ONLY when the poster is the seller offering the deal\n(NOT when a buyer mentions morby method while seeking a lender).\nSignals: \"assumable loan + seller carry\", \"stacking\", \"morby method deal for sale\",\nlayered financing where the seller describes both components.\n  \u2022 Fix & Flip: Seller is offering a distressed, below-market, or as-is property suited for\nrenovation and resale. Poster is the seller or wholesaler of that property.\nSignals: \"fixer upper\", \"as-is\", \"needs work\", \"ARV\", \"after repair value\",\n\"cash only\", \"distressed\", \"motivated seller\", \"handyman special\", \"rehab\".\n  \u2022 JV or Wholesale: Poster IS the seller in a wholesale or partnership deal. Includes:\na wholesaler assigning/marketing a deal they have under contract (the wholesaler\nis the seller here), OR someone explicitly proposing a JV/partnership where they\nare bringing a deal and seeking a co-investor. The poster must be the deal-holder.\nThis is NOT for buyers who are seeking wholesalers to bring them deals.\nSignals: \"I have a deal under contract\", \"assigning my contract\", \"wholesale deal\",\n\"looking for a cash buyer\", \"under contract\", \"JV opportunity\", \"joint venture\",\n\"looking for a JV partner\", \"co-invest with me\", \"partner with me on this deal\".\n  \u2022 Buyers Looking: Buyer is actively seeking properties, deal flow, or transactions to acquire \u2014\nNOT seeking financing or education. Poster's role is buyer/acquirer, and they\nare specifying what they want to buy or what deals to bring them.\nSignals: \"looking for wholesalers\", \"bring me deals\", \"looking for properties\",\n\"I'm a buyer\", \"seeking deals\", \"my buy box\", \"I buy\", \"looking to purchase\",\n\"send me your deals\", \"looking for motivated sellers\".\n  \u2022 Regular: Seller is offering a property conventionally \u2014 standard listing, market price,\nno creative financing terms mentioned or implied. Working through realtors,\nMLS-style language.\n  \u2022 Others: No selling intent AND no active buying intent. Applies to: buyers seeking lenders\nor funding (not seeking the property itself), students asking how to learn,\nmentorship seekers, community introductions, service providers, anyone whose role\nis information-seeker or learner \u2014 not a seller, deal-maker, or active buyer.\n\nSTEP 3 \u2014 CONTACT EXTRACTION:\nExtract into the contact object:\n  author      \u2014 always the post Author name; never leave empty\n  email       \u2014 only if an email address is explicitly written in the post text\n  phone       \u2014 only if a phone number is explicitly written in the post text\n  website     \u2014 only if a URL is explicitly written in the post text\n  dm_requested \u2014 true if the post contains \"DM me\", \"PM me\", \"message me\",\n                 \"reach out\", \"contact me\", \"email me\", or equivalent phrasing\n\nSTEP 4 \u2014 EXTRACTED INFO:\nReturn {\"summary\": \"<one sentence describing what the poster is offering or seeking>\"}.\nSpokes handle full deal extraction directly from the original post."
-                      }
-                    ]
-                  },
-                  "contents": [
-                    {
-                      "role": "user",
-                      "parts": [
-                        {
-                          "text": "@{concat('post#1\\n-------\\nId:', items('For_Each_Filtered_Lead')?['id'],'\\nContent:', items('For_Each_Filtered_Lead')?['content'],'\\nAuthor:', items('For_Each_Filtered_Lead')?['authorName'])}"
-                        }
-                      ]
-                    }
-                  ],
-                  "tools": [
-                    {
-                      "function_declarations": [
-                        {
-                          "name": "classify_lead",
-                          "description": "Classify a single real estate post. Call this once per post. Evaluate has_selling_intent first \u2014 if false, category must be 'Others'.",
-                          "parameters": {
-                            "type": "OBJECT",
-                            "properties": {
-                              "has_selling_intent": {
-                                "type": "BOOLEAN",
-                                "description": "True if the poster is a SELLER or DEAL-MAKER: owner offering a property, wholesaler assigning a contract, or investor proposing a JV. False if the poster is a buyer, learner, lender-seeker, or service provider."
-                              },
-                              "category": {
-                                "type": "STRING",
-                                "enum": [
-                                  "Subject-To",
-                                  "Seller Finance",
-                                  "Hybrid",
-                                  "Fix & Flip",
-                                  "JV or Wholesale",
-                                  "Buyers Looking",
-                                  "Regular",
-                                  "Others"
-                                ],
-                                "description": "When has_selling_intent is true: assign a seller category. When has_selling_intent is false: assign 'Buyers Looking' if actively seeking properties/deal flow, otherwise 'Others'."
-                              },
-                              "extracted_info": {
-                                "type": "STRING",
-                                "description": "JSON-stringified object of deal details. For Others: {\"summary\": \"<one sentence>\"}."
-                              },
-                              "contact": {
-                                "type": "OBJECT",
-                                "properties": {
-                                  "author": {
-                                    "type": "STRING"
-                                  },
-                                  "email": {
-                                    "type": "STRING"
-                                  },
-                                  "phone": {
-                                    "type": "STRING"
-                                  },
-                                  "website": {
-                                    "type": "STRING"
-                                  },
-                                  "dm_requested": {
-                                    "type": "BOOLEAN"
-                                  }
-                                },
-                                "required": [
-                                  "author"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "has_selling_intent",
-                              "category",
-                              "extracted_info",
-                              "contact"
-                            ]
-                          }
-                        }
-                      ]
-                    }
-                  ],
-                  "tool_config": {
-                    "function_calling_config": {
-                      "mode": "ANY",
-                      "allowed_function_names": [
-                        "classify_lead"
-                      ]
-                    }
-                  }
-                },
-                "retryPolicy": {
-                  "type": "exponential",
-                  "count": 4,
-                  "interval": "PT30S",
-                  "minimumInterval": "PT30S",
-                  "maximumInterval": "PT10M"
+                  "stored_at": "@{coalesce(first(body('Get_Existing_Lead')?['value'])?['stored_at'], utcNow())}"
                 }
               },
               "runAfter": {
-                "Upsert_Lead_To_Table": [
+                "Get_Existing_Lead": [
                   "Succeeded"
                 ]
               }
             },
-            "Parse_Classify_Args": {
-              "type": "Compose",
-              "inputs": "@body('Call_Gemini_Classify')['candidates'][0]['content']['parts'][0]['functionCall']['args']",
-              "runAfter": {
-                "Call_Gemini_Classify": [
-                  "Succeeded"
-                ]
-              }
-            },
-            "Enforce_Selling_Intent_Gate": {
-              "type": "Compose",
-              "inputs": "@if(and(not(outputs('Parse_Classify_Args')?['has_selling_intent']),not(or(equals(outputs('Parse_Classify_Args')?['category'],'Others'),equals(outputs('Parse_Classify_Args')?['category'],'Buyers Looking')))),'Others',outputs('Parse_Classify_Args')?['category'])",
-              "runAfter": {
-                "Parse_Classify_Args": [
-                  "Succeeded"
-                ]
-              }
-            },
-            "Upsert_Classification_To_Table": {
+            "Get_Existing_Lead": {
               "type": "ApiConnection",
               "inputs": {
                 "host": {
@@ -276,98 +146,315 @@
                     "name": "@parameters('$connections')['azuretables']['connectionId']"
                   }
                 },
-                "method": "patch",
-                "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities(PartitionKey='@{encodeURIComponent('filtered')}',RowKey='@{encodeURIComponent(items('For_Each_Filtered_Lead')?['id'])}')",
-                "body": {
-                  "has_selling_intent": "@{outputs('Parse_Classify_Args')?['has_selling_intent']}",
-                  "category": "@{outputs('Enforce_Selling_Intent_Gate')}",
-                  "extracted_info": "@{string(coalesce(outputs('Parse_Classify_Args')?['extracted_info'], '{}'))}",
-                  "contact": "@{string(outputs('Parse_Classify_Args')?['contact'])}",
-                  "classified_at": "@{utcNow()}"
+                "method": "get",
+                "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities",
+                "queries": {
+                  "$filter": "@{concat('PartitionKey eq ''filtered'' and RowKey eq ''', items('For_Each_Filtered_Lead')?['id'], '''')}"
                 }
               },
-              "runAfter": {
-                "Enforce_Selling_Intent_Gate": [
-                  "Succeeded"
-                ]
-              }
+              "runAfter": {}
             },
-            "Condition_Route_To_Spoke": {
+            "Condition_Is_New_Lead": {
               "type": "If",
               "expression": {
-                "and": [
+                "or": [
                   {
-                    "not": {
-                      "equals": [
-                        "@outputs('Enforce_Selling_Intent_Gate')",
-                        "Others"
-                      ]
-                    }
+                    "equals": [
+                      "@length(coalesce(body('Get_Existing_Lead')?['value'], json('[]')))",
+                      0
+                    ]
+                  },
+                  {
+                    "equals": [
+                      "@coalesce(first(body('Get_Existing_Lead')?['value'])?['classified_at'], '')",
+                      ""
+                    ]
                   }
                 ]
               },
               "actions": {
-                "Call_Spoke_Outreach": {
-                  "type": "Http",
-                  "description": "Fire-and-forget: hub does not wait for spoke to finish",
-                  "inputs": {
-                    "method": "POST",
-                    "uri": "@parameters('spokeUrls')[outputs('Enforce_Selling_Intent_Gate')]",
-                    "headers": {
-                      "Content-Type": "application/json"
+                "Classify_Lead_Scope": {
+                  "type": "Scope",
+                  "actions": {
+                    "Call_Gemini_Classify": {
+                      "type": "Http",
+                      "inputs": {
+                        "method": "POST",
+                        "uri": "@{concat('https://generativelanguage.googleapis.com/v1beta/models/', parameters('geminiModel'), ':generateContent')}",
+                        "headers": {
+                          "Content-Type": "application/json",
+                          "X-goog-api-key": "@body('Fetch_Api_Key')?['Value']"
+                        },
+                        "body": {
+                          "system_instruction": {
+                            "parts": [
+                              {
+                                "text": "You are a real estate investment analyst. For each post you receive, call classify_lead() exactly once.\n\nSTEP 1 \u2014 SELLING INTENT (decide this before any category):\n\nSet has_selling_intent = true ONLY if the poster is acting as a SELLER or DEAL-MAKER:\n  \u2022 An owner or seller actively offering a property for sale or creative transaction\n  \u2022 A wholesaler marketing or assigning a deal they have under contract (wholesaler IS the seller)\n  \u2022 An investor explicitly proposing a JV or partnership on a specific deal\n\nSet has_selling_intent = false if the poster is:\n  \u2022 A BUYER seeking a lender, broker, or funding for their own acquisition\n  \u2022 A BUYER seeking to find properties or deal flow to acquire (\u2192 check buying intent next)\n  \u2022 Someone asking \"how do I\" or seeking education on creative finance strategies\n  \u2022 Someone introducing themselves or networking without offering a specific deal\n  \u2022 A service provider advertising their own services (agents, attorneys, contractors, etc.)\n  \u2022 Anyone whose primary role in the post is SEEKER or LEARNER, not SELLER or DEAL-MAKER\n\nCRITICAL RULE: The presence of terms like \"morby method\", \"SubTo\", \"seller finance\",\n\"creative financing\" does NOT automatically imply selling intent. Always determine\nthe poster's ROLE (seller vs buyer/seeker) from the full context of the post first.\n\n\u2192 If has_selling_intent = true: proceed to Step 2 (seller categories).\n\u2192 If has_selling_intent = false: check if the poster is a BUYER actively seeking\n  properties or deal flow. If yes \u2192 category = \"Buyers Looking\". If no \u2192 category = \"Others\".\n\nSTEP 2 \u2014 CATEGORY DEFINITIONS (apply only when has_selling_intent = true):\n  \u2022 Subject-To: Seller is offering a property where the buyer takes over the existing mortgage\npayments while the loan remains in the seller's name. The seller retains the loan.\nSignals: \"subject to\", \"sub-to\", \"SubTo\", \"take over my payments\",\n\"existing loan stays in my name\", \"PITI payments\", \"deed transfer with loan in place\".\n  \u2022 Seller Finance: Seller is willing to act as the lender \u2014 carrying the note directly to the buyer\nwith no bank or institutional lender involved for that portion.\nSignals: \"seller financing\", \"owner financing\", \"seller carry\", \"owner will carry\",\n\"I'll finance\", \"seller may carry some\", \"owner carry\", \"carry the note\".\n  \u2022 Hybrid: Seller is offering a deal that explicitly combines BOTH an assumable existing loan\nAND seller carrying a second note for the gap. The poster MUST be the seller.\nIncludes the \"Morby Method\" ONLY when the poster is the seller offering the deal\n(NOT when a buyer mentions morby method while seeking a lender).\nSignals: \"assumable loan + seller carry\", \"stacking\", \"morby method deal for sale\",\nlayered financing where the seller describes both components.\n  \u2022 Fix & Flip: Seller is offering a distressed, below-market, or as-is property suited for\nrenovation and resale. Poster is the seller or wholesaler of that property.\nSignals: \"fixer upper\", \"as-is\", \"needs work\", \"ARV\", \"after repair value\",\n\"cash only\", \"distressed\", \"motivated seller\", \"handyman special\", \"rehab\".\n  \u2022 JV or Wholesale: Poster IS the seller in a wholesale or partnership deal. Includes:\na wholesaler assigning/marketing a deal they have under contract (the wholesaler\nis the seller here), OR someone explicitly proposing a JV/partnership where they\nare bringing a deal and seeking a co-investor. The poster must be the deal-holder.\nThis is NOT for buyers who are seeking wholesalers to bring them deals.\nSignals: \"I have a deal under contract\", \"assigning my contract\", \"wholesale deal\",\n\"looking for a cash buyer\", \"under contract\", \"JV opportunity\", \"joint venture\",\n\"looking for a JV partner\", \"co-invest with me\", \"partner with me on this deal\".\n  \u2022 Buyers Looking: Buyer is actively seeking properties, deal flow, or transactions to acquire \u2014\nNOT seeking financing or education. Poster's role is buyer/acquirer, and they\nare specifying what they want to buy or what deals to bring them.\nSignals: \"looking for wholesalers\", \"bring me deals\", \"looking for properties\",\n\"I'm a buyer\", \"seeking deals\", \"my buy box\", \"I buy\", \"looking to purchase\",\n\"send me your deals\", \"looking for motivated sellers\".\n  \u2022 Regular: Seller is offering a property conventionally \u2014 standard listing, market price,\nno creative financing terms mentioned or implied. Working through realtors,\nMLS-style language.\n  \u2022 Others: No selling intent AND no active buying intent. Applies to: buyers seeking lenders\nor funding (not seeking the property itself), students asking how to learn,\nmentorship seekers, community introductions, service providers, anyone whose role\nis information-seeker or learner \u2014 not a seller, deal-maker, or active buyer.\n\nSTEP 3 \u2014 CONTACT EXTRACTION:\nExtract into the contact object:\n  author      \u2014 always the post Author name; never leave empty\n  email       \u2014 only if an email address is explicitly written in the post text\n  phone       \u2014 only if a phone number is explicitly written in the post text\n  website     \u2014 only if a URL is explicitly written in the post text\n  dm_requested \u2014 true if the post contains \"DM me\", \"PM me\", \"message me\",\n                 \"reach out\", \"contact me\", \"email me\", or equivalent phrasing\n\nSTEP 4 \u2014 EXTRACTED INFO:\nReturn {\"summary\": \"<one sentence describing what the poster is offering or seeking>\"}.\nSpokes handle full deal extraction directly from the original post."
+                              }
+                            ]
+                          },
+                          "contents": [
+                            {
+                              "role": "user",
+                              "parts": [
+                                {
+                                  "text": "@{concat('post#1\\n-------\\nId:', items('For_Each_Filtered_Lead')?['id'],'\\nContent:', items('For_Each_Filtered_Lead')?['content'],'\\nAuthor:', items('For_Each_Filtered_Lead')?['authorName'])}"
+                                }
+                              ]
+                            }
+                          ],
+                          "tools": [
+                            {
+                              "function_declarations": [
+                                {
+                                  "name": "classify_lead",
+                                  "description": "Classify a single real estate post. Call this once per post. Evaluate has_selling_intent first \u2014 if false, category must be 'Others'.",
+                                  "parameters": {
+                                    "type": "OBJECT",
+                                    "properties": {
+                                      "has_selling_intent": {
+                                        "type": "BOOLEAN",
+                                        "description": "True if the poster is a SELLER or DEAL-MAKER: owner offering a property, wholesaler assigning a contract, or investor proposing a JV. False if the poster is a buyer, learner, lender-seeker, or service provider."
+                                      },
+                                      "category": {
+                                        "type": "STRING",
+                                        "enum": [
+                                          "Subject-To",
+                                          "Seller Finance",
+                                          "Hybrid",
+                                          "Fix & Flip",
+                                          "JV or Wholesale",
+                                          "Buyers Looking",
+                                          "Regular",
+                                          "Others"
+                                        ],
+                                        "description": "When has_selling_intent is true: assign a seller category. When has_selling_intent is false: assign 'Buyers Looking' if actively seeking properties/deal flow, otherwise 'Others'."
+                                      },
+                                      "extracted_info": {
+                                        "type": "STRING",
+                                        "description": "JSON-stringified object of deal details. For Others: {\"summary\": \"<one sentence>\"}."
+                                      },
+                                      "contact": {
+                                        "type": "OBJECT",
+                                        "properties": {
+                                          "author": {
+                                            "type": "STRING"
+                                          },
+                                          "email": {
+                                            "type": "STRING"
+                                          },
+                                          "phone": {
+                                            "type": "STRING"
+                                          },
+                                          "website": {
+                                            "type": "STRING"
+                                          },
+                                          "dm_requested": {
+                                            "type": "BOOLEAN"
+                                          }
+                                        },
+                                        "required": [
+                                          "author"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "has_selling_intent",
+                                      "category",
+                                      "extracted_info",
+                                      "contact"
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          ],
+                          "tool_config": {
+                            "function_calling_config": {
+                              "mode": "ANY",
+                              "allowed_function_names": [
+                                "classify_lead"
+                              ]
+                            }
+                          }
+                        },
+                        "retryPolicy": {
+                          "type": "exponential",
+                          "count": 4,
+                          "interval": "PT30S",
+                          "minimumInterval": "PT30S",
+                          "maximumInterval": "PT10M"
+                        }
+                      },
+                      "runAfter": {}
                     },
-                    "body": {
-                      "lead_id": "@items('For_Each_Filtered_Lead')?['id']"
+                    "Parse_Classify_Args": {
+                      "type": "Compose",
+                      "inputs": "@body('Call_Gemini_Classify')['candidates'][0]['content']['parts'][0]['functionCall']['args']",
+                      "runAfter": {
+                        "Call_Gemini_Classify": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Enforce_Selling_Intent_Gate": {
+                      "type": "Compose",
+                      "inputs": "@if(and(not(outputs('Parse_Classify_Args')?['has_selling_intent']),not(or(equals(outputs('Parse_Classify_Args')?['category'],'Others'),equals(outputs('Parse_Classify_Args')?['category'],'Buyers Looking')))),'Others',outputs('Parse_Classify_Args')?['category'])",
+                      "runAfter": {
+                        "Parse_Classify_Args": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Upsert_Classification_To_Table": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['azuretables']['connectionId']"
+                          }
+                        },
+                        "method": "patch",
+                        "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities(PartitionKey='@{encodeURIComponent('filtered')}',RowKey='@{encodeURIComponent(items('For_Each_Filtered_Lead')?['id'])}')",
+                        "body": {
+                          "has_selling_intent": "@{outputs('Parse_Classify_Args')?['has_selling_intent']}",
+                          "category": "@{outputs('Enforce_Selling_Intent_Gate')}",
+                          "extracted_info": "@{string(coalesce(outputs('Parse_Classify_Args')?['extracted_info'], '{}'))}",
+                          "contact": "@{string(outputs('Parse_Classify_Args')?['contact'])}",
+                          "classified_at": "@{utcNow()}"
+                        }
+                      },
+                      "runAfter": {
+                        "Enforce_Selling_Intent_Gate": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Condition_Route_To_Spoke": {
+                      "type": "If",
+                      "expression": {
+                        "and": [
+                          {
+                            "not": {
+                              "equals": [
+                                "@outputs('Enforce_Selling_Intent_Gate')",
+                                "Others"
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "actions": {
+                        "Call_Spoke_Outreach": {
+                          "type": "Http",
+                          "description": "Fire-and-forget: hub does not wait for spoke to finish",
+                          "inputs": {
+                            "method": "POST",
+                            "uri": "@parameters('spokeUrls')[outputs('Enforce_Selling_Intent_Gate')]",
+                            "headers": {
+                              "Content-Type": "application/json"
+                            },
+                            "body": {
+                              "lead_id": "@items('For_Each_Filtered_Lead')?['id']"
+                            }
+                          },
+                          "operationOptions": "DisableAsyncPattern",
+                          "runAfter": {}
+                        },
+                        "Wait_Between_Spokes": {
+                          "type": "Wait",
+                          "inputs": {
+                            "interval": {
+                              "count": 10,
+                              "unit": "Second"
+                            }
+                          },
+                          "runAfter": {
+                            "Call_Spoke_Outreach": [
+                              "Succeeded",
+                              "Failed"
+                            ]
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Upsert_Others_To_Table": {
+                            "type": "ApiConnection",
+                            "inputs": {
+                              "host": {
+                                "connection": {
+                                  "name": "@parameters('$connections')['azuretables']['connectionId']"
+                                }
+                              },
+                              "method": "patch",
+                              "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities(PartitionKey='@{encodeURIComponent('filtered')}',RowKey='@{encodeURIComponent(items('For_Each_Filtered_Lead')?['id'])}')",
+                              "body": {
+                                "outreach_skipped": true,
+                                "is_complete": false,
+                                "missing_fields": "[]",
+                                "outreach_message": "",
+                                "investment_summary": "",
+                                "location_insights": "{}",
+                                "errorMessage": "none",
+                                "outreach_at": "@{utcNow()}"
+                              }
+                            },
+                            "runAfter": {}
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Upsert_Classification_To_Table": [
+                          "Succeeded"
+                        ]
+                      }
                     }
                   },
-                  "operationOptions": "DisableAsyncPattern",
                   "runAfter": {}
                 },
-                "Wait_Between_Spokes": {
-                  "type": "Wait",
+                "Handle_Classify_Error": {
+                  "type": "ApiConnection",
                   "inputs": {
-                    "interval": {
-                      "count": 10,
-                      "unit": "Second"
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['azuretables']['connectionId']"
+                      }
+                    },
+                    "method": "patch",
+                    "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities(PartitionKey='@{encodeURIComponent('filtered')}',RowKey='@{encodeURIComponent(items('For_Each_Filtered_Lead')?['id'])}')",
+                    "body": {
+                      "category": "",
+                      "has_selling_intent": false,
+                      "errorMessage": "@{concat('classification failed (run ', workflow()?['run']?['name'], ')')}",
+                      "classify_failed_at": "@{utcNow()}",
+                      "outreach_skipped": true,
+                      "is_complete": false,
+                      "missing_fields": "[]",
+                      "outreach_message": "",
+                      "investment_summary": "",
+                      "location_insights": "{}"
                     }
                   },
                   "runAfter": {
-                    "Call_Spoke_Outreach": [
-                      "Succeeded",
-                      "Failed"
+                    "Classify_Lead_Scope": [
+                      "Failed",
+                      "TimedOut"
                     ]
                   }
                 }
               },
               "else": {
                 "actions": {
-                  "Upsert_Others_To_Table": {
-                    "type": "ApiConnection",
-                    "inputs": {
-                      "host": {
-                        "connection": {
-                          "name": "@parameters('$connections')['azuretables']['connectionId']"
-                        }
-                      },
-                      "method": "patch",
-                      "path": "/Tables/@{encodeURIComponent(parameters('storageTableName'))}/entities(PartitionKey='@{encodeURIComponent('filtered')}',RowKey='@{encodeURIComponent(items('For_Each_Filtered_Lead')?['id'])}')",
-                      "body": {
-                        "outreach_skipped": true,
-                        "is_complete": false,
-                        "missing_fields": "[]",
-                        "outreach_message": "",
-                        "investment_summary": "",
-                        "location_insights": "{}",
-                        "errorMessage": "none",
-                        "outreach_at": "@{utcNow()}"
-                      }
-                    },
+                  "Skip_Duplicate_Lead": {
+                    "type": "Compose",
+                    "inputs": "@{concat('duplicate \u2014 already classified: ', items('For_Each_Filtered_Lead')?['id'])}",
                     "runAfter": {}
                   }
                 }
               },
               "runAfter": {
-                "Upsert_Classification_To_Table": [
+                "Upsert_Lead_To_Table": [
                   "Succeeded"
                 ]
               }
