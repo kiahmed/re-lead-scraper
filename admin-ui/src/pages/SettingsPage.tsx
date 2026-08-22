@@ -14,6 +14,8 @@ interface Preset {
 /** "Older than" windows. 30 days is here because the monthly sweep's TTLs
  * keep most categories well under three months. */
 const PRESETS: Preset[] = [
+  { label: '7 days', days: 7 },
+  { label: '14 days', days: 14 },
   { label: '30 days', days: 30 },
   { label: '3 months', months: 3 },
   { label: '6 months', months: 6 },
