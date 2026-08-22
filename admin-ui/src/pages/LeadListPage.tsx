@@ -11,8 +11,17 @@ import { StatusGlyph } from '../components/StatusGlyph'
 import { fmtDateTime } from '../lib/format'
 
 const DEFAULT_FILTERS: LeadFilters = {
-  q: '', category: '', is_complete: '', from: '', to: '', page: 1, pageSize: 25,
+  q: '', category: '', is_complete: '', from: '', to: '', city: '', hoa: '', page: 1, pageSize: 25,
 }
+
+/** HOA states as reported by the API — mirrors the pipeline's own patterns.
+ * "Not mentioned" is kept separate from "$0" on purpose: silence is not a
+ * claim that there is no HOA. */
+const HOA_OPTIONS: { value: string; label: string }[] = [
+  { value: 'zero', label: 'No HOA / $0' },
+  { value: 'has', label: 'Has HOA fee' },
+  { value: 'none', label: 'HOA not mentioned' },
+]
 
 export type DatePreset = 'all' | 'today' | 'yesterday' | '7d' | '30d' | 'custom'
 
@@ -116,6 +125,38 @@ export function LeadListPage() {
         <button className="btn" onClick={() => refetch()}>Refresh</button>
       </div>
 
+      <div className="list-toolbar list-toolbar-2">
+        <select
+          className="input"
+          value={filters.city}
+          onChange={(e) => set({ city: e.target.value })}
+          aria-label="City"
+        >
+          <option value="">All cities</option>
+          {(meta.data?.cities ?? Object.keys(data?.city_counts ?? {})).map((city) => (
+            <option key={city} value={city}>
+              {city}{data?.city_counts?.[city] !== undefined ? ` (${data.city_counts[city]})` : ''}
+            </option>
+          ))}
+        </select>
+        <select
+          className="input"
+          value={filters.hoa}
+          onChange={(e) => set({ hoa: e.target.value })}
+          aria-label="HOA"
+        >
+          <option value="">Any HOA</option>
+          {HOA_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}{data?.hoa_counts?.[opt.value] !== undefined ? ` (${data.hoa_counts[opt.value]})` : ''}
+            </option>
+          ))}
+        </select>
+        {(filters.city || filters.hoa) && (
+          <button className="btn" onClick={() => set({ city: '', hoa: '' })}>Clear</button>
+        )}
+      </div>
+
       <div className="cat-tabs" role="tablist">
         <button
           role="tab"
@@ -157,6 +198,14 @@ export function LeadListPage() {
               <span className="muted">· {lead.groupName}</span>
               <CategoryChip category={lead.category} />
               <StatusGlyph {...lead} />
+              {lead.cities.length > 0 && (
+                <span className="muted">📍 {lead.cities.join(', ')}</span>
+              )}
+              {lead.hoa !== 'none' && (
+                <span className={lead.hoa === 'zero' ? 'chip hoa-zero' : 'chip hoa-has'}>
+                  {lead.hoa === 'zero' ? 'No HOA' : 'HOA'}
+                </span>
+              )}
               <span className="muted num lead-row-time">{fmtDateTime(lead.stored_at)}</span>
               <span className="row-actions">
                 <button

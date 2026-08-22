@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from . import tables
+from . import leadfilter, tables
 
 _VALUES_CANDIDATES = (
     Path(__file__).resolve().parents[1] / "values.yaml",   # packaged with the API
@@ -28,6 +28,7 @@ def get_meta() -> dict:
     version = tables.get_entity(tables.TABLE_VERSIONS, "pipeline", "config") or {}
     return {
         "categories": categories,
+        "cities": leadfilter.city_options(),
         "required_fields": required_fields,
         "pipeline": {
             "status": version.get("status", "unknown"),

@@ -319,3 +319,7 @@ a.app-mark:hover { text-decoration: none; }
 .btn-active:hover { background: var(--accent-hover); color: #fff; }
 
 .purge-window { background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: var(--sp-2) var(--sp-3); }
+
+.list-toolbar-2 { flex-wrap: wrap; }
+.hoa-zero { background: var(--ok-bg); color: var(--ok); }
+.hoa-has { background: var(--warn-bg); color: var(--warn); }

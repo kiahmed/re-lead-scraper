@@ -18,6 +18,8 @@ const listResponse: LeadListResponse = {
       is_complete: false,
       outreach_skipped: false,
       keep: false,
+      cities: ['Atlanta'],
+      hoa: 'zero' as const,
       errorMessage: 'none',
       missing_fields: ['asking_price'],
       stored_at: '2026-08-01T09:12:00+00:00',
@@ -30,6 +32,8 @@ const listResponse: LeadListResponse = {
   page: 1,
   pageSize: 25,
   counts: { 'Subject-To': 1 },
+  city_counts: { Atlanta: 1 },
+  hoa_counts: { zero: 1 },
 }
 
 function renderPage() {
@@ -48,7 +52,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     const path = String(url)
     const body = path.includes('/api/meta')
-      ? { categories: ['Subject-To', 'Fix & Flip'], required_fields: {}, pipeline: { status: 'in-sync', deployed_at: '', synced_at: '' } }
+      ? { categories: ['Subject-To', 'Fix & Flip'], cities: ['Atlanta', 'All Other Cities'], required_fields: {}, pipeline: { status: 'in-sync', deployed_at: '', synced_at: '' } }
       : listResponse
     return new Response(JSON.stringify(body), { status: 200 })
   }))
@@ -122,5 +126,32 @@ describe('date filters', () => {
     fireEvent.change(select, { target: { value: 'custom' } })
     expect(screen.getByLabelText('Received from')).toBeInTheDocument()
     expect(screen.getByLabelText('Received to')).toBeInTheDocument()
+  })
+})
+
+describe('city and HOA filters', () => {
+  it('renders both selects with counts and filters by city', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Maria G.')).toBeInTheDocument())
+    const city = screen.getByLabelText('City') as HTMLSelectElement
+    const hoa = screen.getByLabelText('HOA') as HTMLSelectElement
+    expect(city).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Atlanta (1)' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'All Other Cities' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'No HOA / $0 (1)' })).toBeInTheDocument()
+
+    fireEvent.change(city, { target: { value: 'Atlanta' } })
+    fireEvent.change(hoa, { target: { value: 'zero' } })
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>
+    await waitFor(() => {
+      const urls = fetchMock.mock.calls.map((c) => String(c[0]))
+      expect(urls.some((u) => u.includes('city=Atlanta') && u.includes('hoa=zero'))).toBe(true)
+    })
+  })
+
+  it('shows the detected city and HOA badge on a row', async () => {
+    renderPage()
+    await waitFor(() => expect(screen.getByText('No HOA')).toBeInTheDocument())
+    expect(screen.getByText(/📍\s*Atlanta/)).toBeInTheDocument()  // row badge, not the select
   })
 })

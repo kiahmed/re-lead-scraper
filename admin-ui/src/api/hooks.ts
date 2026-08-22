@@ -9,6 +9,8 @@ export interface LeadFilters {
   is_complete: string
   from: string
   to: string
+  city: string
+  hoa: string
   page: number
   pageSize: number
 }
@@ -24,6 +26,8 @@ export function useLeads(filters: LeadFilters) {
           is_complete: filters.is_complete,
           from: filters.from,
           to: filters.to,
+          city: filters.city,
+          hoa: filters.hoa,
           page: String(filters.page),
           pageSize: String(filters.pageSize),
         },

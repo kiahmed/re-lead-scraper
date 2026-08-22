@@ -8,6 +8,8 @@ export interface LeadSummary {
   is_complete: boolean | null
   outreach_skipped: boolean | null
   keep: boolean
+  cities: string[]
+  hoa: 'none' | 'zero' | 'has'
   errorMessage: string
   missing_fields: string[]
   stored_at: string
@@ -32,6 +34,8 @@ export interface LeadListResponse {
   page: number
   pageSize: number
   counts: Record<string, number>
+  city_counts: Record<string, number>
+  hoa_counts: Record<string, number>
 }
 
 export interface Interaction {
@@ -58,6 +62,7 @@ export interface User {
 
 export interface Meta {
   categories: string[]
+  cities: string[]
   required_fields: Record<string, string[]>
   pipeline: { status: string; deployed_at: string; synced_at: string }
 }

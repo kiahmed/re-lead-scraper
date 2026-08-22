@@ -8,7 +8,7 @@ clobbered from the UI. Delete removes the lead row AND its interactions.
 import json
 from datetime import UTC, datetime, timedelta
 
-from . import tables
+from . import leadfilter, tables
 from .http import ApiError
 
 SNIPPET_CHARS = 280
@@ -30,16 +30,19 @@ def _parse_json(value, fallback):
 
 def _to_lead(row: dict, full: bool = False) -> dict:
     content = row.get("content", "")
+    keywords = _parse_json(row.get("keywords"), [])
     lead = {
         "id": row.get("lead_id", "") or row.get("RowKey", ""),
         "authorName": row.get("authorName", ""),
         "groupName": row.get("groupName", ""),
-        "keywords": _parse_json(row.get("keywords"), []),
+        "keywords": keywords,
         "category": row.get("category", ""),
         "has_selling_intent": row.get("has_selling_intent"),
         "is_complete": row.get("is_complete"),
         "outreach_skipped": row.get("outreach_skipped"),
         "keep": bool(row.get("keep", False)),
+        "cities": leadfilter.detect_cities(content, keywords),
+        "hoa": leadfilter.hoa_state(content, keywords),
         "errorMessage": row.get("errorMessage", ""),
         "missing_fields": _parse_json(row.get("missing_fields"), []),
         "stored_at": row.get("stored_at", ""),
@@ -59,24 +62,6 @@ def _to_lead(row: dict, full: bool = False) -> dict:
     else:
         lead["snippet"] = content[:SNIPPET_CHARS] + ("…" if len(content) > SNIPPET_CHARS else "")
     return lead
-
-
-def _matches(lead: dict, category: str, is_complete: str, q: str) -> bool:
-    if category and lead["category"] != category:
-        return False
-    if is_complete in ("true", "false") and lead["is_complete"] is not None:
-        if bool(lead["is_complete"]) != (is_complete == "true"):
-            return False
-    elif is_complete in ("true", "false"):
-        return False
-    if q:
-        hay = " ".join([
-            lead.get("snippet", ""), lead.get("content", ""),
-            lead["authorName"], lead["groupName"], " ".join(lead["keywords"]),
-        ]).lower()
-        if q.lower() not in hay:
-            return False
-    return True
 
 
 def _parse_dt(value: str) -> datetime | None:
@@ -110,31 +95,83 @@ def _parse_dt_or_none(value: str) -> datetime | None:
         return None
 
 
+def _predicates(query: dict, dt_from, dt_to) -> dict:
+    """One predicate per filter dimension, so counts for a dimension can be
+    computed with that dimension's own filter left out (proper faceting)."""
+    category = query.get("category", "")
+    is_complete = query.get("is_complete", "")
+    q = (query.get("q", "") or "").lower()
+    city = query.get("city", "")
+    hoa = query.get("hoa", "")
+
+    def by_category(ld):
+        return not category or (ld["category"] or "Unclassified") == category
+
+    def by_complete(ld):
+        if is_complete not in ("true", "false"):
+            return True
+        if ld["is_complete"] is None:
+            return False
+        return bool(ld["is_complete"]) == (is_complete == "true")
+
+    def by_text(ld):
+        if not q:
+            return True
+        hay = " ".join([
+            ld.get("snippet", ""), ld.get("content", ""),
+            ld["authorName"], ld["groupName"], " ".join(ld["keywords"]),
+        ]).lower()
+        return q in hay
+
+    def by_date(ld):
+        return _in_date_range(ld, dt_from, dt_to)
+
+    def by_city(ld):
+        return leadfilter.matches_city(ld["cities"], city)
+
+    def by_hoa(ld):
+        return not hoa or ld["hoa"] == hoa
+
+    return {
+        "category": by_category, "is_complete": by_complete, "q": by_text,
+        "date": by_date, "city": by_city, "hoa": by_hoa,
+    }
+
+
 def list_leads(query: dict) -> dict:
     rows = tables.query(tables.TABLE_LEADS, "PartitionKey eq 'filtered'")
     all_leads = sorted(
         (_to_lead(r) for r in rows),
         key=lambda ld: ld["stored_at"], reverse=True,
     )
-    category = query.get("category", "")
-    is_complete = query.get("is_complete", "")
-    q = query.get("q", "")
+    to_raw = query.get("to", "")
     dt_from = _parse_dt(query.get("from", ""))
-    dt_to = _parse_dt(query.get("to", ""))
-    if dt_to is not None and "T" not in query.get("to", ""):
+    dt_to = _parse_dt(to_raw)
+    if dt_to is not None and "T" not in to_raw:
         dt_to = dt_to + timedelta(days=1)  # bare date → inclusive end of day
 
-    # counts by category over the search/date-filtered (but not
-    # category-filtered) set, so the category tabs always show what's behind them
-    searched = [
-        ld for ld in all_leads
-        if _matches(ld, "", is_complete, q) and _in_date_range(ld, dt_from, dt_to)
-    ]
-    counts: dict[str, int] = {}
-    for lead in searched:
-        counts[lead["category"] or "Unclassified"] = counts.get(lead["category"] or "Unclassified", 0) + 1
+    preds = _predicates(query, dt_from, dt_to)
 
-    filtered = [ld for ld in searched if _matches(ld, category, "", "")]
+    def subset(exclude: str | None):
+        return [
+            ld for ld in all_leads
+            if all(p(ld) for name, p in preds.items() if name != exclude)
+        ]
+
+    def tally(leads, key):
+        out: dict[str, int] = {}
+        for ld in leads:
+            for value in key(ld):
+                out[value] = out.get(value, 0) + 1
+        return out
+
+    filtered = subset(None)
+    counts = tally(subset("category"), lambda ld: [ld["category"] or "Unclassified"])
+    city_counts = tally(
+        subset("city"), lambda ld: ld["cities"] or [leadfilter.OTHER_CITY]
+    )
+    hoa_counts = tally(subset("hoa"), lambda ld: [ld["hoa"]])
+
     try:
         page = max(1, int(query.get("page", 1)))
         page_size = min(100, max(1, int(query.get("pageSize", 25))))
@@ -147,6 +184,8 @@ def list_leads(query: dict) -> dict:
         "page": page,
         "pageSize": page_size,
         "counts": counts,
+        "city_counts": city_counts,
+        "hoa_counts": hoa_counts,
     }
 
 

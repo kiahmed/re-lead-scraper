@@ -290,3 +290,60 @@ def test_purge_reports_spans_and_undated():
     assert empty["would_purge"] == 0
     assert empty["matched_span"]["oldest"] == ""
     assert empty["data_span"]["oldest"].startswith("2026-01-05")  # still reports real span
+
+
+def seed_text(rk, content, keywords=(), category="Regular"):
+    tables.upsert(tables.TABLE_LEADS, {
+        "PartitionKey": "filtered", "RowKey": rk, "lead_id": rk,
+        "content": content, "keywords": json.dumps(list(keywords)),
+        "category": category, "stored_at": "2026-08-01T09:00:00+00:00",
+    })
+
+
+def test_city_detection_from_content_and_keywords():
+    seed_text("a", "Great duplex in Atlanta, GA", [])
+    seed_text("b", "Nice place downtown", ["Jacksonville"])   # city only in keywords
+    seed_text("c", "Somewhere unspecified")                    # no city at all
+    by_id = {ld["id"]: ld for ld in leads.list_leads({})["items"]}
+    assert by_id["a"]["cities"] == ["Atlanta"]
+    assert by_id["b"]["cities"] == ["Jacksonville"]
+    assert by_id["c"]["cities"] == []
+    assert leads.list_leads({"city": "Atlanta"})["total"] == 1
+    assert leads.list_leads({"city": "All Other Cities"})["total"] == 1  # only 'c'
+
+
+def test_hoa_states_mirror_pipeline_patterns():
+    seed_text("zero1", "Home in Atlanta. HOA: $0")
+    seed_text("zero2", "savannah duplex, no hoa here")
+    seed_text("zero3", "Townhome, HOA = 0")
+    seed_text("has1", "Condo, HOA $250/mo")
+    seed_text("none1", "No mention of that fee at all")
+    by_id = {ld["id"]: ld for ld in leads.list_leads({})["items"]}
+    assert by_id["zero1"]["hoa"] == "zero"
+    assert by_id["zero2"]["hoa"] == "zero"
+    assert by_id["zero3"]["hoa"] == "zero"
+    assert by_id["has1"]["hoa"] == "has"
+    assert by_id["none1"]["hoa"] == "none"
+    assert leads.list_leads({"hoa": "zero"})["total"] == 3
+    assert leads.list_leads({"hoa": "has"})["total"] == 1
+    assert leads.list_leads({"hoa": "none"})["total"] == 1
+
+
+def test_counts_are_faceted():
+    seed_text("a", "Atlanta home, no hoa", category="Subject-To")
+    seed_text("b", "Atlanta condo, HOA $300", category="Regular")
+    seed_text("c", "Savannah lot", category="Regular")
+    # city filter applied → category counts reflect only that city
+    res = leads.list_leads({"city": "Atlanta"})
+    assert res["total"] == 2
+    assert res["counts"] == {"Subject-To": 1, "Regular": 1}
+    # ...but the city counts themselves ignore the city filter, so the
+    # dropdown still shows every option
+    assert res["city_counts"] == {"Atlanta": 2, "Savannah": 1}
+    assert res["hoa_counts"] == {"zero": 1, "has": 1}  # scoped to Atlanta
+
+
+def test_city_and_hoa_combine():
+    seed_text("a", "Atlanta home, no hoa")
+    seed_text("b", "Atlanta condo, HOA $300")
+    assert leads.list_leads({"city": "Atlanta", "hoa": "zero"})["total"] == 1
