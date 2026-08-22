@@ -214,13 +214,22 @@ def purge_leads(params: dict) -> dict:
 
     rows = tables.query(tables.TABLE_LEADS, "PartitionKey eq 'filtered'")
     to_purge: list[dict] = []
-    skipped_keep = skipped_activity = 0
+    skipped_keep = skipped_activity = skipped_undated = 0
     by_category: dict[str, int] = {}
+    all_dates: list[str] = []
+    matched_dates: list[str] = []
     for row in rows:
         lead = _to_lead(row)
-        if not _in_date_range(lead, dt_from, dt_to):
-            continue
+        stored = lead.get("stored_at", "")
+        has_date = _parse_dt_or_none(stored) is not None
+        if has_date:
+            all_dates.append(stored)
         if categories and (lead["category"] or "Unclassified") not in categories:
+            continue
+        if not has_date:
+            skipped_undated += 1  # no timestamp — age unknown, never purged by date
+            continue
+        if not _in_date_range(lead, dt_from, dt_to):
             continue
         if bool(row.get("keep", False)):
             skipped_keep += 1
@@ -232,6 +241,7 @@ def purge_leads(params: dict) -> dict:
             skipped_activity += 1
             continue
         to_purge.append({"row": row, "ipk": ipk, "interactions": interactions})
+        matched_dates.append(stored)
         cat = lead["category"] or "Unclassified"
         by_category[cat] = by_category.get(cat, 0) + 1
 
@@ -248,6 +258,17 @@ def purge_leads(params: dict) -> dict:
         "would_purge": len(to_purge),
         "skipped_keep": skipped_keep,
         "skipped_activity": skipped_activity,
+        "skipped_undated": skipped_undated,
+        # spans let the UI show the real window it just previewed, and explain
+        # an empty result ("your oldest lead is only N days old")
+        "matched_span": {
+            "oldest": min(matched_dates) if matched_dates else "",
+            "newest": max(matched_dates) if matched_dates else "",
+        },
+        "data_span": {
+            "oldest": min(all_dates) if all_dates else "",
+            "newest": max(all_dates) if all_dates else "",
+        },
         "by_category": by_category,
     }
 

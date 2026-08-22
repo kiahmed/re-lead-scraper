@@ -62,6 +62,11 @@ export interface Meta {
   pipeline: { status: string; deployed_at: string; synced_at: string }
 }
 
+export interface DateSpan {
+  oldest: string
+  newest: string
+}
+
 export interface PurgeResult {
   dry_run: boolean
   matched: number
@@ -69,5 +74,8 @@ export interface PurgeResult {
   would_purge: number
   skipped_keep: number
   skipped_activity: number
+  skipped_undated: number
+  matched_span: DateSpan
+  data_span: DateSpan
   by_category: Record<string, number>
 }

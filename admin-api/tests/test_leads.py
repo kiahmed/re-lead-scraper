@@ -269,3 +269,24 @@ def test_purge_by_ttl():
         leads.purge_by_ttl({"ttl_days": {}})
     with pytest.raises(ApiError):
         leads.purge_by_ttl({"ttl_days": {"Others": "soon"}})
+
+
+def test_purge_reports_spans_and_undated():
+    seed_dated("old", "2026-01-05T00:00:00+00:00")
+    seed_dated("mid", "2026-01-20T00:00:00+00:00")
+    seed_dated("new", "2026-07-05T00:00:00+00:00")
+    tables.upsert(tables.TABLE_LEADS, {   # no stored_at at all
+        "PartitionKey": "filtered", "RowKey": "undated", "lead_id": "undated",
+        "content": "x", "keywords": json.dumps([]), "category": "Regular",
+    })
+    result = leads.purge_leads({"to": "2026-06-30"})
+    assert result["would_purge"] == 2
+    assert result["matched_span"]["oldest"].startswith("2026-01-05")
+    assert result["matched_span"]["newest"].startswith("2026-01-20")
+    assert result["data_span"]["newest"].startswith("2026-07-05")
+    assert result["skipped_undated"] == 1  # undated lead is never purged by date
+
+    empty = leads.purge_leads({"to": "2020-01-01"})
+    assert empty["would_purge"] == 0
+    assert empty["matched_span"]["oldest"] == ""
+    assert empty["data_span"]["oldest"].startswith("2026-01-05")  # still reports real span
