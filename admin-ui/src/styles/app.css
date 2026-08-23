@@ -52,8 +52,10 @@
 
 /* ── lead list page ── */
 .list-page {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  /* flex column, not a fixed grid template: only .list-body flexes, so adding
+     another filter row can never hand the free space to the wrong child */
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   height: 100%;
   max-width: 1100px;
@@ -62,10 +64,10 @@
   padding: var(--sp-4) var(--sp-6) 0;
   gap: var(--sp-3);
 }
-.list-toolbar { display: flex; gap: var(--sp-2); }
+.list-toolbar { display: flex; gap: var(--sp-2); flex: none; }
 .list-search { flex: 1; }
 
-.cat-tabs { display: flex; gap: var(--sp-1); flex-wrap: wrap; }
+.cat-tabs { display: flex; gap: var(--sp-1); flex-wrap: wrap; flex: none; align-items: center; }
 .cat-tab {
   border: 1px solid transparent;
   background: none;
@@ -76,7 +78,7 @@
 .cat-tab:hover { color: var(--ink); border-color: var(--border-strong); }
 .cat-tab.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 
-.list-body { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-2); padding-bottom: var(--sp-2); }
+.list-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-2); padding-bottom: var(--sp-2); }
 
 .lead-row {
   background: var(--surface);
@@ -100,6 +102,7 @@
 }
 
 .list-footer {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
