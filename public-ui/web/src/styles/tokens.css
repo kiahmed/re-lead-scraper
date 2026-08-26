@@ -1,0 +1,79 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Blueprint & Ledger — the public deal board.
+
+   The register is a drafting sheet, not an editorial page: warm drafting
+   paper, blueprint indigo ink, and a surveyor's brass accent. Category chip
+   hues are carried over verbatim from the admin UI on purpose — a Subject-To
+   lead should read identically in both apps.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  /* paper */
+  --paper: #f7f4ed;
+  --surface: #fffdf8;
+  --surface-sunk: #f2eee4;
+  --rule: #ded8ca;
+  --rule-strong: #c6bda9;
+
+  /* ink — blueprint indigo, not black */
+  --ink: #16324b;
+  --ink-2: #4a5563;
+  --ink-3: #8b8577;
+
+  /* accent — surveyor brass */
+  --brass: #a8721c;
+  --brass-hover: #8a5d14;
+  --brass-soft: #f6ecd8;
+
+  /* blueprint wash, used for the frieze and drawing rules */
+  --draw: #2f5d86;
+  --draw-soft: #dfe8f0;
+
+  /* semantic */
+  --ok: #1e7a4d;
+  --ok-bg: #e6f3ec;
+  --warn: #9a6b00;
+  --warn-bg: #fbf3dc;
+  --err: #b3352c;
+  --err-bg: #fbebe9;
+
+  /* category hues — matched to the admin UI */
+  --cat-subject-to: #3d4a9e;      --cat-subject-to-bg: #e9ebf8;
+  --cat-seller-finance: #0f6e6a;  --cat-seller-finance-bg: #e2f2f1;
+  --cat-hybrid: #6a3fa0;          --cat-hybrid-bg: #f0e9f9;
+  --cat-fix-flip: #8a5a00;        --cat-fix-flip-bg: #f8efdc;
+  --cat-jv-wholesale: #97431e;    --cat-jv-wholesale-bg: #f9eae2;
+  --cat-buyers-looking: #1a5e8a;  --cat-buyers-looking-bg: #e4f0f8;
+  --cat-regular: #4a5560;         --cat-regular-bg: #eaeef1;
+  --cat-others: #6b6f74;          --cat-others-bg: #efefed;
+
+  /* type — Archivo runs wide for title-block headings, Instrument Sans reads,
+     Plex Mono carries every number so figures line up down a column */
+  --font-display: 'Archivo', 'Arial Narrow', system-ui, sans-serif;
+  --font-ui: 'Instrument Sans', -apple-system, 'Segoe UI', sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+
+  --fs-micro: 11px;
+  --fs-label: 12px;
+  --fs-ui: 14px;
+  --fs-read: 16px;
+  --fs-title: 19px;
+  --fs-display: 30px;
+  --fs-hero: clamp(34px, 6vw, 58px);
+
+  /* rhythm */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 44px;
+  --radius: 5px;
+  --radius-lg: 10px;
+
+  --shadow-card: 0 1px 2px rgba(22, 50, 75, 0.05);
+  --shadow-pop: 0 8px 28px rgba(22, 50, 75, 0.13);
+}

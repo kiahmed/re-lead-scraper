@@ -19,6 +19,26 @@ _EDITABLE_JSON = {"contact", "extracted_info"}
 _EDITABLE_BOOL = {"keep"}  # pinned leads are immune to purge
 
 
+def as_bool(value):
+    """The pipeline writes booleans two ways: the local runner stores a real
+    bool, the hub/spoke Logic Apps store the STRING "True"/"False" (their table
+    bodies interpolate "@{...}"). bool("False") is True, so passing the raw
+    value through marks every Logic-App-written lead as complete / as having
+    selling intent. Returns None when the value is genuinely absent."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("true", "1"):
+            return True
+        if lowered in ("false", "0"):
+            return False
+        return None
+    return bool(value)
+
+
 def _parse_json(value, fallback):
     if not value:
         return fallback
@@ -37,8 +57,8 @@ def _to_lead(row: dict, full: bool = False) -> dict:
         "groupName": row.get("groupName", ""),
         "keywords": keywords,
         "category": row.get("category", ""),
-        "has_selling_intent": row.get("has_selling_intent"),
-        "is_complete": row.get("is_complete"),
+        "has_selling_intent": as_bool(row.get("has_selling_intent")),
+        "is_complete": as_bool(row.get("is_complete")),
         "outreach_skipped": row.get("outreach_skipped"),
         "keep": bool(row.get("keep", False)),
         "cities": leadfilter.detect_cities(content, keywords),
@@ -112,7 +132,8 @@ def _predicates(query: dict, dt_from, dt_to) -> dict:
             return True
         if ld["is_complete"] is None:
             return False
-        return bool(ld["is_complete"]) == (is_complete == "true")
+        # already coerced by _to_lead — never re-bool() a raw table value here
+        return ld["is_complete"] == (is_complete == "true")
 
     def by_text(ld):
         if not q:

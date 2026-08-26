@@ -1,0 +1,9 @@
+{
+  "name": "FlyNest Deal Board",
+  "short_name": "FlyNest",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F4ED",
+  "theme_color": "#F7F4ED",
+  "description": "Fresh creative-finance seller posts, filtered and measured."
+}

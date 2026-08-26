@@ -13,6 +13,7 @@ AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID", "")
 AZURE_CLIENT_SECRET = os.getenv("AZURE_CLIENT_SECRET", "")
 AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID", "")
 AZURE_SUBSCRIPTION_ID = os.getenv("AZURE_SUBSCRIPTION_ID", "")
-AZURE_RESOURCE_GROUP = os.getenv("AZURE_RESOURCE_GROUP", "RELeadScraperGroup")
+# No default: the group name is deployment config, and this repo is public.
+AZURE_RESOURCE_GROUP = os.getenv("AZURE_RESOURCE_GROUP", "")
 AZURE_LOGIC_APP_TRIGGER_URL = os.getenv("AZURE_LOGIC_APP_TRIGGER_URL", "")
 AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")

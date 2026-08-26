@@ -1,0 +1,8 @@
+azure-functions==1.21.3
+azure-data-tables==12.7.0
+PyYAML==6.0.2
+# notification channels — each optional at runtime, notify.py degrades to a
+# clear "channel not configured" error if one is absent
+azure-communication-email==1.0.0
+azure-communication-sms==1.1.0
+pywebpush==2.0.3

@@ -5,9 +5,23 @@
 
 UI      := admin-ui
 API     := admin-api
-RG      := RELeadScraperGroup
-SWA_APP := flynest-admin
-FUNCAPP := flynest-admin-api
+
+# ── Azure identifiers come from .env, never from this file ───────────────────
+# This repo is public; a subscription id and resource group hardcoded here are
+# a free targeting hint. Override any of these per-invocation if you need to.
+ENV_FILE ?= .env
+envget = $(strip $(shell sed -n 's/^$(1)=//p' $(ENV_FILE) 2>/dev/null | head -1 | tr -d '\042\047'))
+
+RG      := $(call envget,AZURE_RESOURCE_GROUP)
+SUB     := $(call envget,AZURE_SUBSCRIPTION_ID)
+SWA_APP := $(or $(call envget,ADMIN_SWA_NAME),flynest-admin)
+FUNCAPP := $(or $(call envget,ADMIN_FUNCAPP_NAME),flynest-admin-api)
+
+# Fail loudly rather than sending an az command to an empty resource group.
+define need_azure
+@test -n "$(RG)"  || { echo "AZURE_RESOURCE_GROUP is not set in $(ENV_FILE)"; exit 1; }
+@test -n "$(SUB)" || { echo "AZURE_SUBSCRIPTION_ID is not set in $(ENV_FILE)"; exit 1; }
+endef
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^# ----/ {sec = substr($$0, 8); sub(/ -+$$/, "", sec); printf "\n\033[1m%s\033[0m\n", sec} /^[a-zA-Z_-]+:.*## / {desc = $$2; gsub(/[A-Za-z][A-Za-z0-9_]*=("[^"]*"|[^ ,]+)/, "\033[38;5;208m&\033[0m", desc); printf "  \033[94m%-16s\033[0m %s\n", $$1, desc}' $(MAKEFILE_LIST)
@@ -67,6 +81,7 @@ deploy-local: build ## Prod simulation: built SPA + API served together on :7071
 	cd $(API) && python3 dev_server.py --port 7071
 
 deploy-azure: ## Build SPA and deploy SPA + managed-functions API to SWA
+	$(need_azure)
 	cd $(UI) && npm run build
 	cp values.yaml $(API)/values.yaml
 	pip3 install -q --target $(API)/.python_packages/lib/site-packages -r $(API)/requirements.txt
@@ -85,6 +100,7 @@ seed: ## Create the local dev admin user (ADMIN_PASSWORD env or prompt)
 	cd $(API) && python3 cli.py create devadmin --display-name "Dev Admin" || true
 
 deploy-be: ## Provision Azure infra (SWA Free + admin tables) via bicep
+	$(need_azure)
 	az deployment group create -g $(RG) -f deploy/admin-ui.bicep --parameters functionAppName=$(FUNCAPP) staticWebAppName=$(SWA_APP)
 	@echo "API code ships together with the SPA: run 'make deploy-azure' (SWA managed functions)."
 	@echo "Standalone Function App (needs Y1 quota): re-run with --parameters deployFunctionApp=true"
@@ -110,13 +126,97 @@ service-token: ## Mint the machine token for the monthly purge sweep (prints onc
 	cd $(API) && python3 cli.py service-token
 
 run-sweep: ## Fire the purge sweep NOW (real delete per TTLs — not a dry run)
-	az rest --method POST --url "https://management.azure.com/subscriptions/fbdc966a-9476-484f-8935-55dee4eef4f3/resourceGroups/$(RG)/providers/Microsoft.Logic/workflows/flynest-admin-purge-sweep/triggers/Monthly/run?api-version=2016-06-01"
+	$(need_azure)
+	az rest --method POST --url "https://management.azure.com/subscriptions/$(SUB)/resourceGroups/$(RG)/providers/Microsoft.Logic/workflows/flynest-admin-purge-sweep/triggers/Monthly/run?api-version=2016-06-01"
 	@echo "sweep triggered — check results in the Settings page or Azure portal run history"
 
 deploy-sweep: ## Deploy/update the monthly purge sweep (TTLs in deploy/admin-ui.bicep)
+	$(need_azure)
 	az deployment group create -g $(RG) -f deploy/admin-ui.bicep \
 		--parameters purgeServiceToken=$$(cd $(API) && python3 cli.py service-token) \
 		--query properties.provisioningState -o tsv
+
+# ---- Public UI ----
+
+PUB_UI  := public-ui/web
+PUB_API := public-ui/api
+PUB_SWA := $(or $(call envget,PUBLIC_SWA_NAME),flynest-public)
+
+pub-install: ## Install public-UI deps (SPA + API)
+	cd $(PUB_UI) && npm install --no-audit --no-fund
+	pip3 install -r $(PUB_API)/requirements.txt
+
+pub-dev: ## Public UI dev: Vite (:5174) + public API (:7072)
+	$(MAKE) -j2 pub-dev-ui pub-run
+
+pub-dev-ui: ## Vite dev server only (proxies /api -> :7072)
+	cd $(PUB_UI) && npm run dev
+
+pub-run: ## Public API only on :7072 (Flask adapter)
+	cd $(PUB_API) && python3 dev_server.py --port 7072
+
+pub-build: ## Production build (typecheck + vite build -> public-ui/web/dist)
+	cd $(PUB_UI) && npm run build
+
+pub-test: ## Public UI + API tests
+	cd $(PUB_API) && python3 -m pytest tests/ -q
+	cd $(PUB_UI) && npx vitest run
+
+pub-lint: ## Lint the public API
+	ruff check $(PUB_API)
+
+pub-typecheck: ## TypeScript strict typecheck for the public SPA
+	cd $(PUB_UI) && npx tsc --noEmit
+
+pub-check: pub-lint pub-typecheck pub-test ## Everything CI would run for the public app
+
+pub-deploy-local: pub-build ## Prod simulation: built SPA + API together on :7072
+	cd $(PUB_API) && python3 dev_server.py --port 7072
+
+pub-migrate: ## Ensure the pub* tables exist
+	cd $(PUB_API) && python3 cli.py migrate
+
+pub-deploy-be: ## Provision public infra (SWA Free + pub* tables) via bicep
+	$(need_azure)
+	az deployment group create -g $(RG) -f public-ui/infra/public-ui.bicep \
+		--parameters staticWebAppName=$(PUB_SWA) \
+		--query properties.outputs.siteUrl -o tsv
+
+pub-deploy-azure: ## Build SPA and deploy SPA + managed-functions API to the public SWA
+	$(need_azure)
+	cd $(PUB_UI) && npm run build
+	cp values.yaml $(PUB_API)/values.yaml
+	pip3 install -q --target $(PUB_API)/.python_packages/lib/site-packages -r $(PUB_API)/requirements.txt
+	cd $(PUB_UI) && SWA_CLI_DEPLOYMENT_TOKEN=$$(az staticwebapp secrets list -n $(PUB_SWA) -g $(RG) --query properties.apiKey -o tsv) \
+		./node_modules/.bin/swa deploy ./dist --api-location ../api --api-language python --api-version 3.11 --env production
+
+pub-settings: ## Push .env notification/OAuth settings to the public SWA
+	@python3 public-ui/tools/push_settings.py
+
+pub-vapid: ## Generate the Web Push key pair (run once, then put both in .env)
+	cd $(PUB_API) && python3 cli.py vapid-keys
+
+pub-service-token: ## Mint the alert notifier's machine token (prints once)
+	cd $(PUB_API) && python3 cli.py service-token
+
+pub-deploy-notifier: ## Deploy/update the 15-minute alert notifier Logic App
+	$(need_azure)
+	az deployment group create -g $(RG) -f public-ui/infra/public-ui.bicep \
+		--parameters staticWebAppName=$(PUB_SWA) \
+		notifierServiceToken=$$(cd $(PUB_API) && python3 cli.py service-token) \
+		--query properties.provisioningState -o tsv
+
+pub-run-alerts: ## Run the alert sweep now (add DRY=1 for a dry run)
+	cd $(PUB_API) && python3 cli.py run-alerts $(if $(filter 1,$(DRY)),--dry-run)
+
+pub-url: ## Print the deployed public site URL
+	$(need_azure)
+	@az staticwebapp show -n $(PUB_SWA) -g $(RG) --query defaultHostname -o tsv | sed 's#^#https://#'
+
+pub-users: ## List public accounts
+	cd $(PUB_API) && python3 cli.py list-users
+
+pub-publish: pub-deploy-be pub-deploy-azure ## Full public deploy: infra then content
 
 # ---- Deployment ----
 
@@ -138,12 +238,15 @@ publish: deploy-be deploy-azure ## Full production deploy: backend then frontend
 	_notmain guard commit push pr ship pull merge clean-branches clean-worktrees \
 	build preview deploy-local deploy-azure run migrate seed deploy-be \
 	create-user disable-user reset-password list-users purge-sessions \
-	package docker-build docker-run publish
+	package docker-build docker-run publish \
+	pub-install pub-dev pub-dev-ui pub-run pub-build pub-test pub-lint pub-typecheck \
+	pub-check pub-deploy-local pub-migrate pub-deploy-be pub-deploy-azure pub-settings \
+	pub-vapid pub-service-token pub-deploy-notifier pub-run-alerts pub-users pub-url pub-publish
 
 # ---- Git workflow ----
 
 # typo guard: any command-line VAR= outside this list fails loudly
-KNOWN_VARS := U m FORCE b
+KNOWN_VARS := U m FORCE b DRY ENV_FILE
 # MAKEOVERRIDES splits quoted values on spaces — only words containing '=' are variable assignments
 BAD_VARS := $(filter-out $(KNOWN_VARS),$(foreach o,$(MAKEOVERRIDES),$(if $(findstring =,$(o)),$(firstword $(subst =, ,$(o))))))
 ifneq ($(BAD_VARS),)

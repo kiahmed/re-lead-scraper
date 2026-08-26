@@ -8,6 +8,7 @@ and MERGE-upserts the url column onto matching rows (both RowKey schemes).
 Usage:  python3 dev-utils/backfill_urls.py [--dry-run]
 Needs:  az CLI logged in + AZURE_STORAGE_CONNECTION_STRING in .env
 """
+import os
 import json
 import subprocess
 import sys
@@ -17,8 +18,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "admin-api"))
 from core import tables  # noqa: E402
 
-SUB = "fbdc966a-9476-484f-8935-55dee4eef4f3"
-RG = "RELeadScraperGroup"
+# Azure identifiers come from .env — this repo is public, so nothing
+# identifying is hardcoded here.
+def _env(key: str) -> str:
+    if os.environ.get(key):
+        return os.environ[key]
+    env_file = Path(__file__).resolve().parents[1] / ".env"
+    if env_file.is_file():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith(f"{key}=") and not line.startswith("#"):
+                return line.partition("=")[2].strip().strip('"').strip("'")
+    raise SystemExit(f"{key} is not set (env or .env)")
+
+
+SUB = _env("AZURE_SUBSCRIPTION_ID")
+RG = _env("AZURE_RESOURCE_GROUP")
 HUB = "filterProcessCreativeLeads"
 BASE = f"https://management.azure.com/subscriptions/{SUB}/resourceGroups/{RG}/providers/Microsoft.Logic/workflows/{HUB}"
 

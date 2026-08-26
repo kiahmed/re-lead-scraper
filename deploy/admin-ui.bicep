@@ -1,6 +1,6 @@
 // Admin UI infrastructure — deliberately separate from main.bicep so the
 // Logic Apps pipeline (values.yaml → sync.py → deploy.py) stays untouched.
-// Deploy once: az deployment group create -g RELeadScraperGroup -f deploy/admin-ui.bicep
+// Deploy once: make deploy-be   (resource group comes from .env)
 // Content ships separately: make deploy-be (function zip) + make deploy-azure (swa deploy).
 param location string = resourceGroup().location
 // Static Web Apps is not offered in eastus — nearest supported region

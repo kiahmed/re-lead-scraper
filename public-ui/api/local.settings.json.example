@@ -1,0 +1,29 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "<AZURE_STORAGE_CONNECTION_STRING>",
+    "AZURE_STORAGE_CONNECTION_STRING": "<AZURE_STORAGE_CONNECTION_STRING>",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "PUBLIC_SITE_URL": "http://localhost:5174",
+
+    "NOTIFY_EMAIL_PROVIDER": "acs",
+    "NOTIFY_FROM_NAME": "FlyNest Leads",
+    "ACS_CONNECTION_STRING": "<endpoint=https://...;accesskey=...>",
+    "ACS_SENDER_ADDRESS": "DoNotReply@<guid>.azurecomm.net",
+
+    "NOTIFY_WEBPUSH_ENABLED": "true",
+    "VAPID_PUBLIC_KEY": "<from: python3 cli.py vapid-keys>",
+    "VAPID_PRIVATE_KEY": "<from: python3 cli.py vapid-keys>",
+    "VAPID_CONTACT_EMAIL": "you@example.com",
+
+    "NOTIFY_SMS_ENABLED": "false",
+    "ACS_SMS_FROM_NUMBER": "+18005551234",
+
+    "OAUTH_GOOGLE_CLIENT_ID": "",
+    "OAUTH_GOOGLE_CLIENT_SECRET": "",
+    "OAUTH_MICROSOFT_CLIENT_ID": "",
+    "OAUTH_MICROSOFT_CLIENT_SECRET": "",
+    "OAUTH_FACEBOOK_CLIENT_ID": "",
+    "OAUTH_FACEBOOK_CLIENT_SECRET": ""
+  }
+}

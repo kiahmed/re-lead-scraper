@@ -14,29 +14,29 @@ az role assignment create --assignee $SP_ID --role "Log Analytics Reader" --scop
 #verify
 az role assignment list \
   --assignee $SP_ID \
-  --resource-group RELeadScraperGroup \
+  --resource-group "$RG" \
   --query "[].{role:roleDefinitionName, scope:scope}" \
   -o table
 
 #test it 
 # list logic apps
-az logic workflow list --resource-group RELeadScraperGroup -o table
+az logic workflow list --resource-group "$RG" -o table
 
 # see run history
 az logic workflow-run list \
-  --resource-group RELeadScraperGroup \
+  --resource-group "$RG" \
   --workflow-name <logic-app-name> \
   -o table
 
 # see a specific run's actions
 az logic workflow-run-action list \
-  --resource-group RELeadScraperGroup \
+  --resource-group "$RG" \
   --workflow-name <logic-app-name> \
   --run-name <run-id> \
   -o table
 #Qery la directy
 WS_NAME=$(az monitor log-analytics workspace list \
-  --resource-group RELeadScraperGroup \
+  --resource-group "$RG" \
   --query "[0].name" -o tsv)
 
 # run a KQL query against the logs

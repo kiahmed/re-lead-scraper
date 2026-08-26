@@ -13,3 +13,16 @@ admin-api/values.yaml
 .python_packages/
 
 .claude/
+
+# public UI
+public-ui/web/dist/
+public-ui/api/local.settings.json
+public-ui/api/values.yaml
+public-ui/api/.pytest_cache/
+public-ui/api/.ruff_cache/
+
+# Claude Code project instructions — local only
+CLAUDE.md
+
+# never commit logs — they leak whatever the run printed
+*.log
